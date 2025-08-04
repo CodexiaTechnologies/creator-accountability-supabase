@@ -8,7 +8,7 @@ name: Daily Creator Accountability Check (10-minute Test)
 # for daily scheduling set it as 0 0 * * *
 on:
   schedule:
-    - cron: '*/10 * * * *'
+    - cron: '0 0 * * *'
   # Allows you to manually trigger the workflow from the Actions tab
   workflow_dispatch:
 
