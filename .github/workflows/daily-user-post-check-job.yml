@@ -19,4 +19,4 @@ jobs:
     steps:
       - name: Send POST request to Supabase Edge Function
         run: |
-          curl -X POST -H "Content-Type: application/json" -d '{}' ${{ secrets.SUPABASE_DAILY_CHECK_URL }}
+          curl -X POST -H "Content-Type: application/json" -d '{}' ${{ secrets.CRON_JOB_URL }}
