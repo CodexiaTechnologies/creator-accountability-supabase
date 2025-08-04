@@ -1,22 +1,13 @@
-// Import the 'serve' function from the Deno standard library.
-// This is used to create an HTTP server in a Deno environment.
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-//import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
 
-// Import Nodemailer directly from npm via Deno's npm: specifier
-// Deno will manage downloading and caching this npm package
 import nodemailer from "npm:nodemailer";
 
-// Define the handler function for the Edge Function.
-// This function will be called when the Edge Function receives an HTTP request.
 serve(async (req) => {
   if (req.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
   }
 
   try {
-    // Parse the JSON payload from the incoming request.
-    // For a Supabase database webhook, this payload will contain information about the database event (e.g., INSERT).
     const payload = await req.json();
 
     console.log('payload record', payload.record);
@@ -24,214 +15,55 @@ serve(async (req) => {
     const newRecord = payload.record;
 
 
-    const header = `<!DOCTYPE html>
+    const userFullHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Confirmation Email</title>
-
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@100..900&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Tajawal:wght@200;300;400;500;700;800;900&display=swap');
-
-    body {
-      margin: 0;
-      font-family: 'Montserrat', sans-serif;
-      background-color: #f2f8fb;
-      color: #333;
-    }
-
-    .container {
-      max-width: 430px;
-      margin: 0 auto;
-      background-color: #fff;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      overflow: hidden;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    }
-
-    .header {
-      background-color: #00AEEF;
-      padding: 12px 16px;
-    }
-
-    .content {
-      padding: 20px;
-      background: #edf6fa;
-    }
-
-    h2 {
-      font-size: 24px;
-      font-weight: 600;
-      margin-bottom: 15px;
-    }
-
-    .greeting {
-      margin-bottom: 20px;
-    }
-
-    p {
-      font-size: 14px;
-      font-weight: 500;
-      color: #4F4F4F;
-    }
-
-    .reference-box {
-      background-color: #222;
-      color: #fff;
-      padding: 12px;
-      text-align: center;
-      border-radius: 6px;
-      font-weight: 600;
-      font-size: 14px;
-      margin: 20px 0;
-      letter-spacing: 0.5px;
-    }
-
-    .summary-box {
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      padding: 12px 16px;
-      background-color: #fff;
-      margin-bottom: 20px;
-      color: #222222 !important;
-    }
-
-    .summary-row {
-      padding: 4px 0;
-      font-size: 12px;
-      font-weight: 500;
-    }
-          td{
-      padding: 3px 0;
-    }
-
-    a {
-      color: #00AEEF;
-      text-decoration: none;
-    }
-
-    .regards-text {
-      font-weight: 400;
-      /* letter-spacing: 1.1px; */
-      line-height: 1.3;
-    }
-
-    .footer {
-      text-align: center;
-      font-size: 14px;
-      font-weight: 500;
-      padding: 20px 16px;
-      background-color: #fff;
-    }
-
-    .copyright {
-      background-color: #00AEEF;
-      color: white;
-      text-align: center;
-      padding: 18px 16px;
-      font-weight: 500;
-      font-size: 14px;
-    }
-
-    @media screen and (max-width: 480px) {
-      .container {
-        border-radius: 0;
-      }
-    }
-  </style>
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Challenge Submission Missed</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden; }
+        .header { background-color: #1a73e8; color: #ffffff; padding: 20px; text-align: center; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .content { padding: 30px; line-height: 1.6; color: #333333; }
+        .content h2 { color: #1a73e8; }
+        .details { background-color: #f9f9f9; padding: 20px; border-radius: 6px; border: 1px solid #eeeeee; margin-top: 20px; }
+        .details p { margin: 5px 0; }
+        .call-to-action { text-align: center; margin-top: 30px; }
+        .call-to-action a { display: inline-block; padding: 12px 24px; background-color: #1a73e8; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold; }
+        .footer { text-align: center; padding: 20px; font-size: 12px; color: #999999; }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <img class="logo" src="https://eduxia.codexia.tech/Centerted.png" style="max-height:80px" alt="NMDC Logo" />
+    <div class="container">
+        <div class="header">
+            <h1>Challenge Submission Missed</h1>
+        </div>
+        <div class="content">
+            <p>Hello **${user.name}**,</p>
+            <p>This email is to inform you that you have missed your daily submission for the LinkedIn challenge on **${yesterday}**.</p>
+            <p>As per the challenge rules, a penalty of **$15** has been deducted from your Stripe account. The transaction has been recorded, and you can view the details on your dashboard.</p>
+            <div class="details">
+                <h2>Action Required:</h2>
+                <p>To avoid further deductions and stay on track, please ensure you submit today's post and comment URLs.</p>
+            </div>
+            <div class="call-to-action">
+                <a href="https://creator-accountability.web.app/" target="_blank">Go to My Dashboard</a>
+            </div>
+            <p>Thank you for your commitment to the Creator Accountability challenge. We're here to help you succeed!</p>
+            <p>Best regards,<br>The Creator Accountability Team</p>
+        </div>
+        <div class="footer">
+            <p>You are receiving this email because you are a participant in the Creator Accountability challenge.</p>
+        </div>
     </div>
-
-    <div class="content">`
-
-    const footer = ` <p class="regards-text"><strong>Warm regards,</strong><br />The NMDC Team<br />IMAALGELI Mobile
-        Platform<br />info@nmdcs.com</p>
-    </div>
-
-    <div class="copyright">@2025 IMAALGELI</div>
-  </div>
 </body>
-
 </html>`
 
-    const requestHTML = `<div class="reference-box">${newRecord.reference_number}</div>
-      <div class="summary-box">
-        <table width="100%" border="0" cellspacing="0" cellpadding="0">
-          <tbody>
-            <tr class="summary-row">
-              <td style="width: 40%;">Name:</td>
-              <td style="width: 60%; text-align: right;">${newRecord.name}</td>
-            </tr>
-            <tr class="summary-row">
-              <td style="width: 40%;">Email:</td>
-              <td style="width: 60%; text-align: right;">${newRecord.email}</td>
-            </tr>
-            <tr class="summary-row">
-              <td style="width: 40%;">Location:</td>
-              <td style="width: 60%; text-align: right;">${newRecord.country}</td>
-            </tr>
-            <tr class="summary-row">
-              <td style="width: 40%;">Phone No:</td>
-              <td style="width: 60%; text-align: right;">${newRecord.phone}</td>
-            </tr>
-            <tr class="summary-row">
-              <td style="width: 50%;">Number of Shares:</td>
-              <td style="width: 50%; text-align: right;">${newRecord.shares_requested}</td>
-            </tr>
-            <tr class="summary-row">
-              <td style="width: 50%;">Price Per Share:</td>
-              <td style="width: 50%; text-align: right;">$${newRecord.price_per_share}</td>
-            </tr>
-            <tr class="summary-row">
-              <td style="width: 50%;">Total Shares:</td>
-              <td style="width: 50%; text-align: right;">$${(newRecord.shares_requested * newRecord.price_per_share).toFixed(2)}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>`
-
-    const userGreeting = ` <h2>Confirmation Email</h2>
-    <div class="greeting">
-        <p><strong>Dear ${newRecord.name},</strong></p>
-        <p>
-          Thank you for registering your interest in owning shares with
-          <strong>New Mogadishu Development Corporation (NMDC)</strong> through
-          the IMAALGELI app.
-        </p>
-        <p>
-          Your submission has been received successfully and your Reference no is:
-        </p>
-      </div>`
-
-      const adminGreeting = `<div class="greeting">
-      <p><strong>Dear Admin,</strong></p>
-<p>
-  A new investor <strong>${newRecord.name}</strong> has submitted their interest in owning shares with
-  <strong>New Mogadishu Development Corporation (NMDC)</strong> through the IMAALGELI app.
-</p>
-<p>
-  The submission has been received successfully. Below are the details:
-</p></div>`
-
-const userHelpHTML = `<p>Our team will review your submission and contact you if further information is needed.</p>
-      <p>
-        If you have any questions, feel free to reach out to us via our website:
-        <br />
-        <a href="https://nmdcs.com">https://nmdcs.com</a>
-      </p>`
-
-    const userFullHtml = `${header}${userGreeting}${requestHTML}${userHelpHTML}${footer}`;
-    const adminFullHtml = `${header}${adminGreeting}${requestHTML}${footer}`;
 
     const SMTP = {
-      name: "Imaalgeli App",
+      name: "Creator Accountability",
       host: 'premium154.web-hosting.com',
       port: 465,
       secure: true, // true for 465, false for other ports
@@ -249,28 +81,15 @@ const userHelpHTML = `<p>Our team will review your submission and contact you if
 
   const userData = {
       from: '"Creator Accountability App" <noreply@codexiatech.com>',
-      to: "asimilyas527@gmail.com",
-      subject: `Confirmation: Your Shares Request Has Been Received`,
+      to: user.email || "asimilyas527@gmail.com",
+      subject: `Action Required: Your Challenge Submission for ${yesterday} was Missed`,
       html: userFullHtml,
-      text: `Confirmation: Your Shares Request Has Been Received`,
-    };
-
-      const adminData = {
-      from: '"Creator Accountability App" <noreply@codexiatech.com>',
-      to: "asimilyas527@gmail.com",
-      subject: `New Submission Alert: ${newRecord.name} Requested ${newRecord.shares_requested} Shares`,
-      html: adminFullHtml,
-      text: `New Submission Alert: ${newRecord.name} Requested ${newRecord.shares_requested} Shares`,
+      text: `Action Required: Your Challenge Submission for ${yesterday} was Missed`,
     };
 
       transporter.sendMail(userData, (error, info) => {
         console.log( 'user:', info);
         console.log( 'user:', error);
-      });
-
-      transporter.sendMail(adminData, (error, info) => {
-        console.log( 'admin', info);
-        console.log( 'admin', error);
       });
 
     return new Response("Email sent successfully", { status: 200 });
