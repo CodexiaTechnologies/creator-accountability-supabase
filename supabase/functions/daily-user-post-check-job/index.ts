@@ -108,14 +108,16 @@ serve(async (req) => {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  // 2. Initialize Supabase client with the service role key
+  try {
+
+    console.log('test 1');
+      // 2. Initialize Supabase client with the service role key
   // This key is necessary to bypass Row Level Security and update any user's data
   const supabase = createClient(
     'https://swyqqttetwwjrvlcsfam.supabase.co/',
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN3eXFxdHRldHd3anJ2bGNzZmFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM4NTYzODUsImV4cCI6MjA2OTQzMjM4NX0.KP_4Ejbh8hPlT_QkBT7TR5x9EVPFUgkdyd18l1XK2p0'
   );
 
-  try {
     console.log("Starting daily challenge check...");
 
     // 3. Get yesterday's date for comparison
@@ -258,7 +260,7 @@ serve(async (req) => {
     });
 
   } catch (err: any) {
-    console.error("An unexpected error occurred:", err);
+    console.error("An unexpected error occurred:", err.message);
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
