@@ -1,0 +1,33 @@
+# .github/workflows/cron-job.yml
+
+name: Daily Creator Accountability Check
+
+# This defines the schedule. 'cron' is the keyword.
+# The cron expression '0 0 * * *' means "at 00:00 (midnight) every day"
+# This will trigger the job every day at 12:00 AM UTC
+# on:
+  # schedule:
+    # - cron: '0 0 * * *'
+
+# This defines the hourly schedule for testing
+# The cron expression '0 * * * *' means "at the 0th minute of every hour"
+# Example: 1:00 AM, 2:00 AM, 3:00 AM, etc. (in UTC)
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+    
+  # Allows you to manually trigger the workflow from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  run_daily_check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send POST request to Supabase Edge Function
+        run: |
+          # Use curl to send the POST request
+          # We use the -X POST flag to specify the HTTP method
+          # We pass in an empty JSON body with -d '{}'
+          # We use the GitHub secret for the URL for security
+          curl -X POST -H "Content-Type: application/json" -d '{}' ${{ secrets.CRON_JOB_URL }}
