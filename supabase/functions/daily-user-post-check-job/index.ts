@@ -131,11 +131,11 @@ serve(async (req) => {
 
        // Step 5: Send Email
       const userData = {
-        from: '"Creator Accountability App" <noreply@codexiatech.com>',
-        to: "asimilyas527@gmail.com", // user.email || 
-        subject: `Your Challenge Submission for ${yesterdayDate} was Missed`,
+        from: '"Creator Accountability" <noreply@codexiatech.com>',
+        to: user.email || "asimilyas527@gmail.com",
+        subject: `Deduction Confirmed: Missed Linkedin Challenge Submission`,
         html: getHtmlTemplate(user, yesterdayDate),
-        text: `Your Challenge Submission for ${yesterdayDate} was Missed`,
+        text: `Deduction Confirmed: Missed Linkedin Challenge Submission`,
       };
 
       transporter.sendMail(userData, (error, info) => {
@@ -193,7 +193,7 @@ serve(async (req) => {
 
 function getHtmlTemplate(user, missedDate) {
 
-  const missedDateObj = new Date(yesterdayDate);
+  const missedDateObj = new Date(missedDate);
   const formattedDate = missedDateObj.toLocaleDateString("en-US", {
     weekday: "long",   // e.g. Sunday
     year: "numeric",
@@ -232,7 +232,7 @@ function getHtmlTemplate(user, missedDate) {
                 <p>As per the challenge rules, a penalty of <b>$15</b> has been deducted from your Stripe account. The transaction has been recorded, and you can view the details in your dashboard.</p>
                 <div class="details">
                     <h2>Action Required:</h2>
-                    <p>To avoid further deductions and stay on track, please ensure you submit today's post and comment URLs.</p>
+                    <p>To avoid any further deductions, please ensure you submit today's post and comment URLs.</p>
                 </div>
                 <div class="call-to-action">
                     <a href="https://creator-accountability.web.app/" target="_blank">Go to My Dashboard</a>
