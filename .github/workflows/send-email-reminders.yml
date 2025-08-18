@@ -1,0 +1,20 @@
+# .github/workflows/send-email-reminders.yml
+
+# This defines the hourly schedule for testing
+# The cron expression '*/10 * * * *' means "every 10 minutes"
+# for every hour set it as 0 * * * *
+# for daily scheduling set it as 0 0 * * *
+name: Send Email Reminders
+
+on:
+  schedule:
+    - cron: '0 14 * * *'   # Runs daily at 9:00 UTC '0 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  send_email_reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send POST request to Supabase Edge Function (send-email-reminders)
+        run: |
+          curl -X POST -H "Content-Type: application/json" -d '{}' ${{ secrets.REMINDER_JOB_URL }}
