@@ -1,9 +1,14 @@
 # .github/workflows/send-email-reminders.yml
+
+# This defines the hourly schedule for testing
+# The cron expression '*/10 * * * *' means "every 10 minutes"
+# for every hour set it as 0 * * * *
+# for daily scheduling set it as 0 0 * * *
 name: Send Email Reminders
 
 on:
   schedule:
-    - cron: '0 9 * * *'   # Runs daily at 9:00 UTC
+    - cron: '0/10 * * * *'   # Runs daily at 9:00 UTC '0 9 * * *'
   workflow_dispatch:
 
 jobs:
