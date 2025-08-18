@@ -112,16 +112,45 @@ serve(async (req) => {
         continue;
       }
 
-      // Step 4: Insert penalty
-      const { error: insertError } = await supabase.from("payment_intents").insert({
-        user_id: user.id,
-        stripe_customer_id: user.stripe_customer_id,
-        amount: 15.0,
-        missed_date: yesterdayDate,
-        is_paid: false,
-        payment_status: "completed",
-        remarks: "User missed the submission",
-      });
+        // Step 3: Deduct penalty + record in DB
+  const paymentResult = await processPenalty(user, yesterdayDate);
+
+// // Step 3b: Deduct penalty via Stripe
+// let confirmedPayment = null;
+// let paymentStatus = "failed";
+
+// try {
+//   const paymentIntent = await stripe.paymentIntents.create({
+//     amount: 1500,
+//     currency: "usd",
+//     customer: user.stripe_customer_id,  // ⚡ use user's Stripe customer
+//     description: `Missed submission fine for user ${user.id} on ${yesterdayDate}`,
+//   });
+
+//   confirmedPayment = await stripe.paymentIntents.confirm(paymentIntent.id, {
+//     payment_method: "pm_card_visa", // for testing, replace in production
+//   });
+
+//   console.log(`✅ Stripe payment successful. Transaction ID: ${confirmedPayment.id}`);
+//   paymentStatus = "completed";
+
+// } catch (err: any) {
+//   console.error(`❌ Stripe payment failed for user ${user.id}`, err.message);
+//   // continue the flow, do not throw
+//   paymentStatus = "failed";
+// }
+
+     // Step 4: Insert penalty record regardless of Stripe success/failure
+const { error: insertError } = await supabase.from("payment_intents").insert({
+  user_id: user.id,
+  stripe_customer_id: user.stripe_customer_id,
+  amount: 15.0,
+  missed_date: yesterdayDate,
+  transaction_id: paymentResult?.transactionId || null,
+  is_paid: paymentResult?.status === "completed",
+  payment_status: paymentResult?.status || "Pending",
+  remarks: "User missed the submission",
+});
       
       if (insertError) {
         console.error(`❌ Error inserting payment for ${user.id}`, insertError);
@@ -147,38 +176,6 @@ serve(async (req) => {
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-
-
-    // 7. If no submission found, proceed with the fine deduction
-    //try {
-    // Deduct $15.00 (1500 cents) from Stripe
-    // const paymentIntent = await stripe.paymentIntents.create({
-    //   amount: 1500,
-    //   currency: 'usd',
-    //   customer: stripe_customer_id,
-    //   description: `Missed submission fine for user ${user_id} on ${yesterdayDate}`,
-    // });
-
-    // // Confirm the payment intent
-    // const confirmedPayment = await stripe.paymentIntents.confirm(
-    //   paymentIntent.id,
-    //   { payment_method: 'pm_card_visa' } // Example payment method for testing
-    // );
-
-    // console.log(`Stripe payment successful. Transaction ID: ${confirmedPayment.id}`);
-
-    // } catch (stripeError: any) {
-    //   console.error(`Stripe charge failed for user ${user_id}:`, stripeError.message);
-    //   // Log the failed payment attempt in your database
-    //   await supabase.from('payment_intents').insert({
-    //     user_id: user_id,
-    //     date_missed: yesterdayDate,
-    //     amount_deducted: 15.00,
-    //     transaction_id: null,
-    //     payment_status: 'failed',
-    //     error_message: stripeError.message,
-    //   });
-    // }
 
 
   } catch (err: any) {
@@ -249,4 +246,39 @@ function getHtmlTemplate(user, missedDate) {
   `;
 
   return emailHtml;
+}
+
+
+/**
+ * Deducts $15 penalty from a user and records it in Supabase.
+ * Returns { status: "completed" | "failed", transactionId?: string }
+ */
+export async function processPenalty(user: any, yesterdayDate: string) {
+  let confirmedPayment = null;
+  let paymentStatus = "failed";
+
+  try {
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: 1500,
+      currency: "usd",
+      customer: user.stripe_customer_id,
+      description: `Missed submission fine for user ${user.id} on ${yesterdayDate}`,
+    });
+
+    confirmedPayment = await stripe.paymentIntents.confirm(paymentIntent.id, {
+      payment_method: "pm_card_visa", // ⚠️ testing only
+    });
+
+    console.log(`✅ Stripe payment successful. Txn: ${confirmedPayment.id}`);
+    paymentStatus = "completed";
+  } catch (err: any) {
+    console.error(`❌ Stripe payment failed for user ${user.id}`, err.message);
+    paymentStatus = "failed"; // don't throw
+  }
+
+  return {
+    status: paymentStatus,
+    transactionId: confirmedPayment?.id || null,
+  };
+
 }
