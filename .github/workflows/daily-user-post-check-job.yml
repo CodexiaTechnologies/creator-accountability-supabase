@@ -1,6 +1,6 @@
 # .github/workflows/daily-user-post-check-job.yml
 
-name: Daily Creator Accountability Check (10-minute Test)
+name: Daily Creator Accountability Check
 
 # This defines the hourly schedule for testing
 # The cron expression '*/10 * * * *' means "every 10 minutes"
