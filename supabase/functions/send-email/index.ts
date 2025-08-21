@@ -1,9 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import Stripe from 'https://esm.sh/stripe@12.1.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import nodemailer from "npm:nodemailer";
-
-const stripe = new Stripe("sk_test_51Rpr1u0mDkO4nNWr2uYJ7C7jkvCMdgDncsmNFAAfmfSrZ7iExaaZtBvyyjV9qChaozhtjkAmZQ1ey9kYWSPkAfGN00yVt4SALY", { apiVersion: "2020-08-27" });
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -53,7 +50,7 @@ serve(async (req) => {
       .select("*")
       .not("stripe_customer_id", "is", null)
       .not("start_date", "is", null)
-    // .not("is_completed", "is", true)
+      .not("is_completed", "is", true)
     // .lte("start_date", currentDate)
     // .gte("end_date", currentDate);
 
@@ -144,9 +141,13 @@ function getHtmlTemplate(user, missedDate) {
     </head>
     <body>
         <div class="container">
-            <div class="header">
-                <h1>Challenge Submission is Pending</h1>
-            </div>
+            <div class="header" style="text-align:center;">
+              <img src="https://eduxia.codexia.tech/creator-logo.png" alt="Creator Logo" 
+                style="max-height:65px; display:block; margin:0 auto;" />
+              <h1 style="margin:10px 0 0 0; font-size:20px; font-family:sans-serif; color:#ffffff;">
+                Challenge Submission is Pending
+              </h1>
+            </div>   
             <div class="content">
                 <p>Hello ${user.name},</p>
                 <p>This is a reminder that your daily submission for the LinkedIn challenge is pending for today, <b>${formattedDate}</b>.</p>

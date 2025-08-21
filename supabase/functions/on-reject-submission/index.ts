@@ -3,8 +3,10 @@ import Stripe from 'https://esm.sh/stripe@12.1.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import nodemailer from "npm:nodemailer";
 
-const stripe = new Stripe("sk_test_51Rpr1u0mDkO4nNWr2uYJ7C7jkvCMdgDncsmNFAAfmfSrZ7iExaaZtBvyyjV9qChaozhtjkAmZQ1ey9kYWSPkAfGN00yVt4SALY", { apiVersion: "2020-08-27" });
-
+//test stripe key
+//const stripe = new Stripe("sk_test_51Rpr1u0mDkO4nNWr2uYJ7C7jkvCMdgDncsmNFAAfmfSrZ7iExaaZtBvyyjV9qChaozhtjkAmZQ1ey9kYWSPkAfGN00yVt4SALY", { apiVersion: "2020-08-27" });
+//live stripe key
+const stripe = new Stripe("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", { apiVersion: "2020-08-27" });
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -149,9 +151,13 @@ function getHtmlTemplate(user, missedDate) {
     </head>
     <body>
         <div class="container">
-            <div class="header">
-                <h1>Challenge Submission Rejected</h1>
-            </div>
+          <div class="header" style="text-align:center;">
+            <img src="https://eduxia.codexia.tech/creator-logo.png" alt="Creator Logo" 
+              style="max-height:65px; display:block; margin:0 auto;" />
+            <h1 style="margin:10px 0 0 0; font-size:20px; font-family:sans-serif; color:#ffffff;">
+              Challenge Submission Rejected
+            </h1>
+          </div>           
             <div class="content">
                 <p>Hello ${user.name},</p>
                 <p>This email is to inform you that your daily submission for the LinkedIn challenge on <b>${formattedDate}</b> Rejected by Admin.</p>
