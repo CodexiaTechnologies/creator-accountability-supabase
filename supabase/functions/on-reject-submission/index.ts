@@ -3,9 +3,8 @@ import Stripe from 'https://esm.sh/stripe@12.1.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import nodemailer from "npm:nodemailer";
 
-//test stripe key
+//test stripe
 //const stripe = new Stripe("sk_test_51Rpr1u0mDkO4nNWr2uYJ7C7jkvCMdgDncsmNFAAfmfSrZ7iExaaZtBvyyjV9qChaozhtjkAmZQ1ey9kYWSPkAfGN00yVt4SALY", { apiVersion: "2020-08-27" });
-//live stripe key
 const stripe = new Stripe("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", { apiVersion: "2020-08-27" });
 
 const corsHeaders = {
