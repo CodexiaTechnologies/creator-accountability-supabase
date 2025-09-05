@@ -27,9 +27,8 @@ serve(async (req) => {
 
     // ✅ Init Supabase with Service Role Key (make sure you add it in project)
   const supabase = createClient(
-    'https://swyqqttetwwjrvlcsfam.supabase.co/',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN3eXFxdHRldHd3anJ2bGNzZmFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM4NTYzODUsImV4cCI6MjA2OTQzMjM4NX0.KP_4Ejbh8hPlT_QkBT7TR5x9EVPFUgkdyd18l1XK2p0'
-  );
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "" );
 
     // ✅ Create Auth user
     const { data: userData, error: authError } = await supabase.auth.admin.createUser({
@@ -56,7 +55,7 @@ serve(async (req) => {
     // After inserting new creator row, get back serial_no
 const { data: creatorData, error: dbError } = await supabase
   .from("creators")
-  .insert({ auth_user_id: newUser.id, email, full_name })
+  .insert({ auth_user_id: newUser.id, email, full_name, creator_url_id: creator_slug })
   .select("id, serial_no, email, full_name")
   .single();
 
@@ -65,11 +64,11 @@ const { data: creatorData, error: dbError } = await supabase
 
 if (dbError) throw dbError;
 
-      const creator_slug = generateCreatorSlug(full_name, email, creatorData.serial_no);
+      const creator_slug2 = generateCreatorSlug(full_name, email, creatorData.serial_no);
 
 // Now update row with final url_id
 await supabase.from("creators")
-  .update({ creator_url_id: creator_username })
+  .update({ creator_url_id: creator_slug2 })
   .eq("id", creatorData.id);
 
 
