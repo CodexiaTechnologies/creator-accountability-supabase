@@ -1,36 +1,27 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import nodemailer from "npm:nodemailer";
-
 // ✅ CORS setup
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, ApiKey",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, ApiKey"
 };
-
-serve(async (req) => {
+serve(async (req)=>{
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
-
   const headers = { ...corsHeaders, "Content-Type": "application/json" };
-
   try {
-    const { email, password, full_name } = await req.json();
-
+    const { email, password, full_name, bio } = await req.json();
     if (!email || !password) {
       return new Response(
         JSON.stringify({ error: "Email and password are required." }),
         { status: 400, headers }
       );
     }
-
     // ✅ Init Supabase with Service Role Key (make sure you add it in project)
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
-
+    const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
     // ✅ Create Auth user
     const { data: userData, error: authError } = await supabase.auth.admin.createUser({
       email,
@@ -38,79 +29,64 @@ serve(async (req) => {
       email_confirm: true,
       user_metadata: { role: "creator", full_name },
     });
-
-    console.log(userData)
-    console.log(authError)
-
+    console.log(userData);
+    console.log(authError);
     if (authError) {
       console.error("Auth error:", authError.message);
-      return new Response(JSON.stringify({ error: authError.message }), {
-        status: 400,
-        headers,
-      });
+      return new Response(JSON.stringify({ error: authError.message }), { status: 400, headers });
     }
-
     const newUser = userData.user;
     const creator_slug = generateCreatorSlug(full_name, email, 127);
-
     // After inserting new creator row, get back serial_no
-    const { data: creatorData, error: dbError } = await supabase
-      .from("creators")
-      .insert({ auth_user_id: newUser.id, email, full_name, creator_url_id: creator_slug })
-      .select("id, serial_no, email, full_name")
-      .single();
-
-    console.log(creatorData)
-    console.log(dbError)
-
+    const { data: creatorData, error: dbError } = await supabase.from("creators").insert({
+      auth_user_id: newUser.id,
+      email,
+      bio: bio || '',
+      full_name,
+      creator_url_id: creator_slug
+    }).select("id, serial_no, email, full_name").single();
+    console.log(creatorData);
+    console.log(dbError);
     if (dbError) throw dbError;
-
     const creator_slug2 = generateCreatorSlug(full_name, email, creatorData.serial_no);
-
     // Now update row with final url_id
-    await supabase.from("creators")
-      .update({ creator_url_id: creator_slug2 })
-      .eq("id", creatorData.id);
-
-
-    sendEmailToCreator(full_name, email, creator_slug2, password)
-
-    return new Response(JSON.stringify({ creator: creatorData }), {
+    await supabase.from("creators").update({
+      creator_url_id: creator_slug2
+    }).eq("id", creatorData.id);
+    sendEmailToCreator(full_name, email, creator_slug2, password);
+    return new Response(JSON.stringify({
+      creator: creatorData
+    }), {
       status: 200,
-      headers,
+      headers
     });
   } catch (err) {
     console.error("Unexpected error:", err);
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({
+      error: err.message
+    }), {
       status: 500,
-      headers,
+      headers
     });
   }
 });
-
-
-function generateCreatorSlug(full_name: string | null, email: string, serial: number): string {
+function generateCreatorSlug(full_name, email, serial) {
   let base = "";
-
   if (full_name && full_name.trim().length > 0) {
     base = full_name.trim().toLowerCase();
   } else {
     base = email.split("@")[0].toLowerCase();
   }
-
   // replace spaces, dots, and special chars with underscores
   base = base.replace(/[\s.]+/g, "_");
-
   return `${base}_${serial}`;
 }
-
 function sendEmailToCreator(full_name, email, url_id, pass) {
-
   const SMTP = {
     name: "Creator Accountability",
     host: 'premium154.web-hosting.com',
     port: 465,
-    secure: true, // true for 465, false for other ports
+    secure: true,
     auth: {
       user: "noreply@codexiatech.com",
       pass: "D65hj)OcLas0"
@@ -119,26 +95,21 @@ function sendEmailToCreator(full_name, email, url_id, pass) {
       // do not fail on invalid certs
       rejectUnauthorized: false
     }
-  }
+  };
   const transporter = nodemailer.createTransport(SMTP);
-
   // Step 5: Send Email
   const userData = {
     from: '"Creator Accountability" <noreply@codexiatech.com>',
     to: email || "asimilyas527@gmail.com",
     subject: `Welcome to the Creator Accountability Challenge, Your Account is Ready`,
     html: getHtmlTemplate(full_name, email, url_id, pass),
-    text: `Welcome to the Creator Accountability Challenge, Your Account is Ready`,
+    text: `Welcome to the Creator Accountability Challenge, Your Account is Ready`
   };
-
-  transporter.sendMail(userData, (error, info) => {
+  transporter.sendMail(userData, (error, info)=>{
     console.log('user:', info, 'error', error);
   });
 }
-
-
 function getHtmlTemplate(full_name, email, url_id, pass) {
-
   const emailHtml = `
     <!DOCTYPE html>
     <html lang="en">
@@ -211,6 +182,5 @@ function getHtmlTemplate(full_name, email, url_id, pass) {
     </body>
     </html>
   `;
-
   return emailHtml;
 }
