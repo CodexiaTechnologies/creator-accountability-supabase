@@ -1,70 +1,74 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import nodemailer from "npm:nodemailer";
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, ApiKey",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, ApiKey"
 };
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders
+    });
   }
-
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
+    const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
     const { email } = await req.json();
-
     if (!email) {
-      return new Response(JSON.stringify({ error: "Email is required" }), {
+      return new Response(JSON.stringify({
+        error: "Email is required"
+      }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json"
+        }
       });
     }
-
     // ✅ Step 1: Check if user exists in Auth
     const { data: users, error: userError } = await supabase.auth.admin.listUsers();
     if (userError) throw userError;
-
     const user = users?.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
     if (!user) {
-      return new Response(JSON.stringify({ error: "No account found with this email" }), {
+      return new Response(JSON.stringify({
+        error: "No account found with this email"
+      }), {
         status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json"
+        }
       });
     }
-
     // ✅ Step 2: Generate password reset (recovery) link
     const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
       type: "recovery",
       email,
       options: {
-        redirectTo: "https://cpanel-creator-accountability.web.app/update-password",
-      },
+        redirectTo: "https://cpanel-creator-accountability.web.app/update-password"
+      }
     });
-
     if (linkError) throw linkError;
     const resetLink = linkData?.properties?.action_link || "https://cpanel-creator-accountability.web.app/update-password";
-
     if (!resetLink) {
-      return new Response(JSON.stringify({ error: "Failed to generate reset link" }), {
+      return new Response(JSON.stringify({
+        error: "Failed to generate reset link"
+      }), {
         status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json"
+        }
       });
     }
-
     // ✅ Step 3: Setup SMTP transport
     const transporter = nodemailer.createTransport({
       name: "Creator Accountability",
       host: 'premium154.web-hosting.com',
       port: 465,
-      secure: true, // true for 465, false for other ports
+      secure: true,
       auth: {
         user: "noreply@codexiatech.com",
         pass: "D65hj)OcLas0"
@@ -74,34 +78,42 @@ serve(async (req) => {
         rejectUnauthorized: false
       }
     });
-
     // ✅ Step 4: Prepare Email
     const mailOptions = {
-      from: '"Creator Accountability" <noreply@cech.com>',
+      from: '"Creator Accountability" <noreply@codexiatech.com>',
       to: email,
       subject: "Reset Your Password – Creator Accountability",
       html: getHtmlTemplate(email, resetLink),
-      text: `Hello, reset your password here: ${resetLink}`,
+      text: `Hello, reset your password here: ${resetLink}`
     };
-
     await transporter.sendMail(mailOptions);
 
-    return new Response(JSON.stringify({ success: true, message: "Reset email sent" }), {
+    return new Response(JSON.stringify({
+      success: true,
+      message: "Reset email sent"
+    }), {
       status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json"
+      }
     });
-  } catch (err: any) {
-    console.error("Unexpected error:", err);
-    return new Response(JSON.stringify({ error: err.message }), {
+  } catch (err) {
+    console.error("Unexpected error thrown:", err);
+    return new Response(JSON.stringify({
+      error: err.message
+    }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json"
+      }
     });
   }
 });
-
 // ✅ Custom HTML Email Template
-function getHtmlTemplate(email: string, resetLink: string) {
-    const emailHtml = `
+function getHtmlTemplate(email, resetLink) {
+  const emailHtml = `
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -127,7 +139,7 @@ function getHtmlTemplate(email: string, resetLink: string) {
               <img src="https://eduxia.codexia.tech/creator-logo.png" alt="Creator Logo" 
                 style="max-height:65px; display:block; margin:0 auto;" />
               <h1 style="margin:10px 0 0 0; font-size:20px; font-family:sans-serif; color:#ffffff;">
-                Challenge Submission is Pending
+                Reset Your Password
               </h1>
             </div>   
             <div class="content">
@@ -143,6 +155,5 @@ function getHtmlTemplate(email: string, resetLink: string) {
     </body>
     </html>
   `;
-
-  return emailHtml
+  return emailHtml;
 }
