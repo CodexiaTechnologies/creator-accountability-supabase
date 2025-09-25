@@ -15,15 +15,13 @@ serve(async (req) => {
   try {
 
     const { creatorId, email, stripe_account_id } = await req.json();
-    const body = await req.json();
-    const creatorId = body.creatorId;
 
     if (!creatorId) {
       return new Response(JSON.stringify({ error: "creatorId required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
-    const stripe = new Stripe(Deno.env.get("STRIPE_TEST_KEY") ?? "", { apiVersion: "2020-08-27" });
+    const stripe = new Stripe(Deno.env.get("STRIPE_ASIM_TEST_KEY") ?? "", { apiVersion: "2020-08-27" });
 
     console.log('step2')
     let accountId = stripe_account_id;
@@ -49,8 +47,8 @@ serve(async (req) => {
     }
 
     // 3. Create an account link (onboarding) for Express account
-    const refreshUrl = `${Deno.env.get("APP_BASE_URL")}/creator/connect/refresh?creatorId=${creatorId}`;
-    const returnUrl = `${Deno.env.get("APP_BASE_URL")}/creator/dashboard?onboard=success`;
+    const refreshUrl = `${Deno.env.get("CREATOR_URL")}/dashboard?onboard=refresh`;
+    const returnUrl = `${Deno.env.get("CREATOR_URL")}/dashboard?onboard=success`;
 
     const accountLink = await stripe.accountLinks.create({
       account: accountId,

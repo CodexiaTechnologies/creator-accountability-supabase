@@ -15,7 +15,7 @@ serve(async (req) => {
     console.log('step2')
 
     const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
-    const stripe = new Stripe(Deno.env.get("STRIPE_TEST_KEY") ?? "", { apiVersion: "2020-08-27" });
+    const stripe = new Stripe(Deno.env.get("STRIPE_ASIM_TEST_KEY") ?? "", { apiVersion: "2020-08-27" });
 
     if (!stripe_account_id) {
       const { data: creator } = await supabase.from("creators").select("id, stripe_account_id").eq("id", creatorId).maybeSingle();
@@ -24,7 +24,7 @@ serve(async (req) => {
 
     console.log('step3')
     // retrieve Stripe account
-    const acct = await stripe.accounts.retrieve(creator.stripe_account_id);
+    const acct = await stripe.accounts.retrieve( stripe_account_id || creator.stripe_account_id);
     console.log('step4', acct)
     // update DB with important flags
     const updates: any = {
@@ -33,9 +33,13 @@ serve(async (req) => {
       stripe_charges_enabled: acct?.charges_enabled || false
     };
 
-    await supabase.from("creators").update(updates).eq("id", creatorId);
+    const { data: updatedCreator, error: updateError } = await supabase.from("creators")
+      .update(updates).eq("id", creatorId).select("*").single();
+
+    if (updateError) throw updateError;
+
     console.log('step5')
-    return new Response(JSON.stringify({ account: acct, updated: updates }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ creator: updatedCreator, stripe_acctount:acct }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err: any) {
     console.error("check-status error:", err);
     return new Response(JSON.stringify({ error: err.message || String(err) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
