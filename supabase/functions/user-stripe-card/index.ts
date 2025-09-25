@@ -31,8 +31,7 @@ serve(async (req) => {
       });
     }
 
-    console.log("Received token:", token);
-    console.log("Received userId:", userId);
+    console.log("Received token:", token, "Received userId:", userId);
 
     // Create a new Stripe customer
     const customer = await stripe.customers.create({

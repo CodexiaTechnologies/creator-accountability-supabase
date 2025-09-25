@@ -39,30 +39,21 @@ serve(async (req) => {
       });
     }
 
-    console.log("Received userId:", user.id);
+    const { data: creator, error: creatorError } = await supabase.from("creators").select("id, stripe_account_id").eq("id", user.creator_id).single();
+    //if (!creator || !creator.stripe_account_id) return new Response(JSON.stringify({ error: "Creator or stripe_account_id not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    const { data: settings_list, error: settingsError } = await supabase.from("shares_settings").select("*");
+
+    console.log('creator', creator, creatorError);
+    console.log('share setting', settings_list, settingsError);
+
+    let shares_data = settings_list?.length ? settings_list[0] : {}
+
 
     const currentDate = new Date().toISOString().split('T')[0];
 
-    const SMTP = {
-      name: "Creator Accountability",
-      host: 'premium154.web-hosting.com',
-      port: 465,
-      secure: true, // true for 465, false for other ports
-      auth: {
-        user: "noreply@codexiatech.com",
-        pass: "D65hj)OcLas0"
-      },
-      tls: {
-        // do not fail on invalid certs
-        rejectUnauthorized: false
-      }
-    }
-    const transporter = nodemailer.createTransport(SMTP);
-
-    console.log(`➡️ Checking user: ${user.id}, ${user.email}`);
-
     // Step 3: Deduct penalty + record in DB
-    const paymentResult = await processPenalty(user, currentDate);
+    const paymentResult = await processPenalty(user, creator?.stripe_account_id || '', shares_data, currentDate);
 
     // Step 4: Insert penalty record regardless of Stripe success/failure
     const { error: insertError } = await supabase.from("payment_intents").insert({
@@ -81,6 +72,24 @@ serve(async (req) => {
     } else {
       console.log(`💰 Payment record created for user ${user.id}`);
     }
+
+    const SMTP = {
+      name: "Creator Accountability",
+      host: 'premium154.web-hosting.com',
+      port: 465,
+      secure: true, // true for 465, false for other ports
+      auth: {
+        user: "noreply@codexiatech.com",
+        pass: "D65hj)OcLas0"
+      },
+      tls: {
+        // do not fail on invalid certs
+        rejectUnauthorized: false
+      }
+    }
+    const transporter = nodemailer.createTransport(SMTP);
+
+    console.log(`➡️ Checking user: ${user.id}, ${user.email}`);
 
     // Step 5: Send Email
     const userData = {
@@ -180,21 +189,34 @@ function getHtmlTemplate(user, missedDate) {
  * Deducts $15 penalty from a user and records it in Supabase.
  * Returns { status: "completed" | "failed", transactionId?: string }
  */
-export async function processPenalty(user: any, currentDate: string) {
+export async function processPenalty(user: any, stripe_account_id: any, shares_data: any, currentDate: string) {
   let confirmedPayment = null;
   let paymentStatus = "failed";
+  const amount = (shares_data?.charging_amount * 100) || 1500; // $15 fine in cents
 
   try {
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: 1500,
+    const paymentIntentObj: any = {
+      amount,
       currency: "usd",
       customer: user.stripe_customer_id,
       description: `Rejected submission fine for user ${user.id} on ${currentDate}`,
-    });
-
-    confirmedPayment = await stripe.paymentIntents.confirm(paymentIntent.id, {
       payment_method: "pm_card_visa", // ⚠️ testing only
-    });
+      confirm: true,
+    };
+
+    if (stripe_account_id) {
+
+      const platformCut = amount - Math.round(amount * (share_settings?.creator_share_percentage || 15) / 100);
+
+      paymentIntentObj.transfer_data = {
+        destination: stripe_account_id, // ✅ Creator’s Stripe Connect ID
+      };
+      
+      paymentIntentObj.application_fee_amount = platformCut; // ✅ Platform cut
+
+    }
+    
+    confirmedPayment = await stripe.paymentIntents.create(paymentIntentObj);
 
     console.log(`✅ Stripe payment successful. Txn: ${confirmedPayment.id}`);
     paymentStatus = "completed";
