@@ -17,18 +17,21 @@ serve(async (req) => {
     const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
     const stripe = new Stripe(Deno.env.get("STRIPE_ASIM_TEST_KEY") ?? "", { apiVersion: "2020-08-27" });
 
-    if (!stripe_account_id) {
+    let stripe_id = stripe_account_id || '';
+    if (!stripe_id) {
       const { data: creator } = await supabase.from("creators").select("id, stripe_account_id").eq("id", creatorId).maybeSingle();
+      console.log( 'step2.2', creator)
       if (!creator || !creator.stripe_account_id) return new Response(JSON.stringify({ error: "Creator or stripe_account_id not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      else { stripe_id = creator.stripe_account_id }
     }
 
     console.log('step3')
     // retrieve Stripe account
-    const acct = await stripe.accounts.retrieve( stripe_account_id || creator.stripe_account_id);
+    const acct = await stripe.accounts.retrieve(stripe_id);
     console.log('step4', acct)
     // update DB with important flags
     const updates: any = {
-      stripe_account_status: acct?.status || null,
+      stripe_account_status: acct?.status || acct?.details_submitted || null,
       stripe_payouts_enabled: acct?.payouts_enabled || false,
       stripe_charges_enabled: acct?.charges_enabled || false
     };
@@ -39,7 +42,7 @@ serve(async (req) => {
     if (updateError) throw updateError;
 
     console.log('step5')
-    return new Response(JSON.stringify({ creator: updatedCreator, stripe_acctount:acct }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ creator: updatedCreator, stripe_account: acct }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err: any) {
     console.error("check-status error:", err);
     return new Response(JSON.stringify({ error: err.message || String(err) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
