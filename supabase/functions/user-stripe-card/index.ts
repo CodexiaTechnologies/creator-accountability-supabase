@@ -1,14 +1,10 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import Stripe from 'https://esm.sh/stripe@12.1.0?target=deno';
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-//test stripe
-//const stripe = new Stripe("sk_test_51Rpr1u0mDkO4nNWr2uYJ7C7jkvCMdgDncsmNFAAfmfSrZ7iExaaZtBvyyjV9qChaozhtjkAmZQ1ey9kYWSPkAfGN00yVt4SALY", { apiVersion: "2020-08-27" }); 2025-08-21
-const stripe = new Stripe("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", { apiVersion: "2020-08-27" });
 
 const corsHeaders = {
-   'Access-Control-Allow-Origin': '*', // Allows requests from any origin
+  'Access-Control-Allow-Origin': '*', // Allows requests from any origin
   'Access-Control-Allow-Methods': 'POST, OPTIONS', // Only allow POST and OPTIONS
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, ApiKey',
 };
@@ -20,7 +16,7 @@ serve(async (req) => {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-    // Combine CORS headers with content type for the main responses
+  // Combine CORS headers with content type for the main responses
   const headers = { ...corsHeaders, "Content-Type": "application/json" };
 
   try {
@@ -46,29 +42,26 @@ serve(async (req) => {
 
     console.log("customer:", customer);
 
-     // Initialize Supabase client with the Service Role Key
-    const supabase = createClient(
-      'https://swyqqttetwwjrvlcsfam.supabase.co/',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN3eXFxdHRldHd3anJ2bGNzZmFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM4NTYzODUsImV4cCI6MjA2OTQzMjM4NX0.KP_4Ejbh8hPlT_QkBT7TR5x9EVPFUgkdyd18l1XK2p0'
-    );
+    // Initialize Supabase client with the Service Role Key
+    const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
 
-      // Dates
-const startDate = new Date();
-const endDate = new Date();
-endDate.setDate(startDate.getDate() + 30);
+    // Dates
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setDate(startDate.getDate() + 30);
 
-// Format as YYYY-MM-DD
-const formatDate = (d: Date) => d.toISOString().split("T")[0];
+    // Format as YYYY-MM-DD
+    const formatDate = (d: Date) => d.toISOString().split("T")[0];
 
-// Update Supabase table
-const { data, error } = await supabase
-  .from("users").update({
-    stripe_customer_id: customer.id,
-    start_date: formatDate(startDate),
-    end_date: formatDate(endDate),
-    missed_days: 0,
-    is_completed: false,
-  }).eq("id", userId);
+    // Update Supabase table
+    const { data, error } = await supabase
+      .from("users").update({
+        stripe_customer_id: customer.id,
+        start_date: formatDate(startDate),
+        end_date: formatDate(endDate),
+        missed_days: 0,
+        is_completed: false,
+      }).eq("id", userId);
 
     if (error) {
       console.error("Supabase update error:", error);

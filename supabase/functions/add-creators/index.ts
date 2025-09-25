@@ -7,7 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, ApiKey"
 };
-serve(async (req)=>{
+serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
@@ -105,7 +105,7 @@ function sendEmailToCreator(full_name, email, url_id, pass) {
     html: getHtmlTemplate(full_name, email, url_id, pass),
     text: `Welcome to the Creator Accountability Challenge, Your Account is Ready`
   };
-  transporter.sendMail(userData, (error, info)=>{
+  transporter.sendMail(userData, (error, info) => {
     console.log('user:', info, 'error', error);
   });
 }
@@ -139,41 +139,44 @@ function getHtmlTemplate(full_name, email, url_id, pass) {
                 Welcome to the Creator Accountability Challenge
               </h1>
             </div>   
-            <div class="content">
-                <p>Hi <b>${full_name}<b>,</p>
-                <p>
-                 Your Creator account has been successfully set up for the LinkedIn Challenge. 
-      You can now log in to your dashboard, update your profile, and share your unique 
-      creator link with your followers so they can join and participate.
-                </p>
+             <div class="content">
+              <p>Hi <b>${full_name}</b>,</p>
+      <p>
+        Your Creator account has been successfully created for the LinkedIn Challenge.  
+        Before you can share your Creator link with your audience, please complete the following steps in your Creator Dashboard:
+      </p>
 
-                    <div class="details" style="margin:20px 0; padding:15px; background:#f7f7f7; border-radius:6px;">
-      <h2 style="margin-top:0; font-size:16px; color:#1a73e8;">Your Account Details:</h2>
-      <p><b>Login Email:</b> ${email}</p>
-      <p><b>Password:</b> ${pass}</p>
-      <p><b>Your Creator Link:</b> 
-        <a href="https://creator-accountability.web.app/?creators=${url_id}" target="_blank">
-          https://creator-accountability.web.app/?creators=${url_id}
+      <ul style="margin:15px 0; padding-left:20px; color:#333; font-size:14px; line-height:1.6;">
+        <li><b>Update your profile</b> – Add your name, bio, and LinkedIn URL so followers know more about you.</li>
+        <li><b>Connect your Stripe account</b> – This is required to receive payouts directly to your bank account.</li>
+        <li><b>Secure your login</b> – Change your password after your first login.</li>
+      </ul>
+
+      <div class="details" style="margin:20px 0; padding:15px; background:#f7f7f7; border-radius:6px;">
+        <h2 style="margin-top:0; font-size:16px; color:#1a73e8;">Your Account Details:</h2>
+        <p><b>Login Email:</b> ${email}</p>
+        <p><b>Password:</b> ${pass}</p>
+        <p><b>Your Creator Link (active after setup):</b> 
+          <a href="https://creator-accountability.web.app/?creators=${url_id}" target="_blank">
+            https://creator-accountability.web.app/?creators=${url_id}
+          </a>
+        </p>
+      </div>
+
+      <div class="call-to-action" style="margin:20px 0; text-align:center;">
+        <a href="https://cpanel-creator-accountability.web.app/login" target="_blank" 
+           style="background:#1a73e8; color:#fff; padding:12px 20px; border-radius:6px; text-decoration:none; font-weight:bold;">
+          Login to Creator Dashboard
         </a>
-      </p>
-      <p style="margin-top:10px; font-size:14px; color:#555;">
-        Please use the above credentials to log in and remember to change your password 
-        immediately after your first login for security purposes.
-      </p>
-    </div>
-        <div class="call-to-action" style="margin:20px 0; text-align:center;">
-      <a href="https://cpanel-creator-accountability.web.app/login" target="_blank" 
-         style="background:#1a73e8; color:#fff; padding:12px 20px; border-radius:6px; text-decoration:none; font-weight:bold;">
-        Login to Creator Dashboard
-      </a>
-    </div>
+      </div>
 
- <p>
-      Thank you for joining the Creator Accountability Challenge. We’re excited to have you on board and 
-      look forward to supporting your journey!
-    </p>
-    <p>Best regards,<br><b>The Creator Accountability Team</b></p>
-  </div>
+      <p style="font-size:14px; color:#555;">
+        Once your profile and Stripe account are set up, your Creator link will be ready to share with your followers.  
+        They’ll be able to sign up and participate in your challenges, while you receive earnings directly to your connected account.
+      </p>
+
+      <p>Best regards,<br><b>The Creator Accountability Team</b></p>
+    </div>
 
   <div class="footer" style="text-align:center; font-size:12px; color:#888; margin-top:20px;">
     <p>You are receiving this email because an Admin created your account for the Creator Accountability Challenge.</p>

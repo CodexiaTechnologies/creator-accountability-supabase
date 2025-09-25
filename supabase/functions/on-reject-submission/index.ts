@@ -3,10 +3,6 @@ import Stripe from 'https://esm.sh/stripe@12.1.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import nodemailer from "npm:nodemailer";
 
-//test stripe
-//const stripe = new Stripe("sk_test_51Rpr1u0mDkO4nNWr2uYJ7C7jkvCMdgDncsmNFAAfmfSrZ7iExaaZtBvyyjV9qChaozhtjkAmZQ1ey9kYWSPkAfGN00yVt4SALY", { apiVersion: "2020-08-27" });
-const stripe = new Stripe("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", { apiVersion: "2020-08-27" });
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -28,11 +24,8 @@ serve(async (req) => {
   const headers = { ...corsHeaders, "Content-Type": "application/json" };
 
   // 2. Initialize Supabase client with the service role key
-  // This key is necessary to bypass Row Level Security and update any user's data
-  const supabase = createClient(
-    'https://swyqqttetwwjrvlcsfam.supabase.co/',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN3eXFxdHRldHd3anJ2bGNzZmFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM4NTYzODUsImV4cCI6MjA2OTQzMjM4NX0.KP_4Ejbh8hPlT_QkBT7TR5x9EVPFUgkdyd18l1XK2p0'
-  );
+  const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
+  const stripe = new Stripe(Deno.env.get("STRIPE_ASIM_TEST_KEY") ?? "", { apiVersion: "2020-08-27" });
 
   try {
     // Attempt to parse the request body

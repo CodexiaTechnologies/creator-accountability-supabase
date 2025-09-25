@@ -3,10 +3,6 @@ import Stripe from 'https://esm.sh/stripe@12.1.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import nodemailer from "npm:nodemailer";
 
-//test stripe
-//const stripe = new Stripe("sk_test_51Rpr1u0mDkO4nNWr2uYJ7C7jkvCMdgDncsmNFAAfmfSrZ7iExaaZtBvyyjV9qChaozhtjkAmZQ1ey9kYWSPkAfGN00yVt4SALY", { apiVersion: "2020-08-27" });
-const stripe = new Stripe("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", { apiVersion: "2020-08-27" });
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -21,11 +17,8 @@ serve(async (req) => {
   }
 
   // 2. Initialize Supabase client with the service role key
-  // This key is necessary to bypass Row Level Security and update any user's data
-  const supabase = createClient(
-    'https://swyqqttetwwjrvlcsfam.supabase.co/',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN3eXFxdHRldHd3anJ2bGNzZmFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM4NTYzODUsImV4cCI6MjA2OTQzMjM4NX0.KP_4Ejbh8hPlT_QkBT7TR5x9EVPFUgkdyd18l1XK2p0'
-  );
+  const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
+  const stripe = new Stripe(Deno.env.get("STRIPE_ASIM_TEST_KEY") ?? "", { apiVersion: "2020-08-27" });
 
   try {
     console.log("Starting daily challenge check...");
@@ -76,13 +69,13 @@ serve(async (req) => {
       if (new Date(currentDate) > new Date(user.end_date)) {
 
         const { error: completeError } = await supabase.from("users").update({ is_completed: true }).eq("id", user.id);
-    
+
         if (completeError) {
           console.error(`❌ Error updating user ${user.id} to completed`, completeError);
         } else {
           console.log(`🏁 Marked user ${user.id} as completed`);
         }
-    
+
       }
 
       // Step 2: Check payment_intents
@@ -113,28 +106,28 @@ serve(async (req) => {
         continue;
       }
 
-        // Step 3: Deduct penalty + record in DB
-  const paymentResult = await processPenalty(user, yesterdayDate);
+      // Step 3: Deduct penalty + record in DB
+      const paymentResult = await processPenalty(user, yesterdayDate);
 
-     // Step 4: Insert penalty record regardless of Stripe success/failure
-const { error: insertError } = await supabase.from("payment_intents").insert({
-  user_id: user.id,
-  stripe_customer_id: user.stripe_customer_id,
-  amount: 15.0,
-  missed_date: yesterdayDate,
-  transaction_id: paymentResult?.transactionId || null,
-  is_paid: paymentResult?.status === "completed",
-  payment_status: paymentResult?.status || "Pending",
-  remarks: "User missed the submission",
-});
-      
+      // Step 4: Insert penalty record regardless of Stripe success/failure
+      const { error: insertError } = await supabase.from("payment_intents").insert({
+        user_id: user.id,
+        stripe_customer_id: user.stripe_customer_id,
+        amount: 15.0,
+        missed_date: yesterdayDate,
+        transaction_id: paymentResult?.transactionId || null,
+        is_paid: paymentResult?.status === "completed",
+        payment_status: paymentResult?.status || "Pending",
+        remarks: "User missed the submission",
+      });
+
       if (insertError) {
         console.error(`❌ Error inserting payment for ${user.id}`, insertError);
       } else {
         console.log(`💰 Payment record created for user ${user.id}`);
       }
 
-       // Step 5: Send Email
+      // Step 5: Send Email
       const userData = {
         from: '"Creator Accountability" <noreply@codexiatech.com>',
         to: user.email || "asimilyas527@gmail.com",

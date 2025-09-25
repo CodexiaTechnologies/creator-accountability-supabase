@@ -17,10 +17,7 @@ serve(async (req) => {
 
   // 2. Initialize Supabase client with the service role key
   // This key is necessary to bypass Row Level Security and update any user's data
-  const supabase = createClient(
-    'https://swyqqttetwwjrvlcsfam.supabase.co/',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN3eXFxdHRldHd3anJ2bGNzZmFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM4NTYzODUsImV4cCI6MjA2OTQzMjM4NX0.KP_4Ejbh8hPlT_QkBT7TR5x9EVPFUgkdyd18l1XK2p0'
-  );
+  const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
 
   try {
     console.log("Starting daily challenge check...");
@@ -78,8 +75,8 @@ serve(async (req) => {
         continue;
       }
 
-  
-       // Step 5: Send Email
+
+      // Step 5: Send Email
       const userData = {
         from: '"Creator Accountability" <noreply@codexiatech.com>',
         to: user.email || "asimilyas527@gmail.com",
