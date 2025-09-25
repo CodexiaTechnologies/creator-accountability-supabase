@@ -152,8 +152,8 @@ function getHtmlTemplate(full_name, email, url_id, pass) {
       <p><b>Login Email:</b> ${email}</p>
       <p><b>Password:</b> ${pass}</p>
       <p><b>Your Creator Link:</b> 
-        <a href="https://creator-accountability.web.app/creators/${url_id}" target="_blank">
-          https://creator-accountability.web.app/creators/${url_id}
+        <a href="https://creator-accountability.web.app/?creators=${url_id}" target="_blank">
+          https://creator-accountability.web.app/?creators=${url_id}
         </a>
       </p>
       <p style="margin-top:10px; font-size:14px; color:#555;">
@@ -162,7 +162,7 @@ function getHtmlTemplate(full_name, email, url_id, pass) {
       </p>
     </div>
         <div class="call-to-action" style="margin:20px 0; text-align:center;">
-      <a href="https://creator-accountability.web.app/login" target="_blank" 
+      <a href="https://cpanel-creator-accountability.web.app/login" target="_blank" 
          style="background:#1a73e8; color:#fff; padding:12px 20px; border-radius:6px; text-decoration:none; font-weight:bold;">
         Login to Creator Dashboard
       </a>
