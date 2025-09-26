@@ -21,19 +21,24 @@ serve(async (req) => {
 
   try {
     // Attempt to parse the request body
-    const { token, paymentMethodId, userId, stripe_customer_id } = await req.json();
+    const { token, paymentMethodId, userId, stripe_customer_id, stripe_env } = await req.json();
 
     // Input validation
-    if (!token || !paymentMethodId) {
+    if (!token && !paymentMethodId) {
       return new Response(JSON.stringify({ error: "Missing token." }), {
         status: 400,
         headers: headers,
       });
     }
 
-    console.log("Received token:", token, "Received userId:", userId);
+    let s_key_env = stripe_env || "STRIPE_ASIM_TEST_KEY";
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_ASIM_TEST_KEY") ?? "", { apiVersion: "2020-08-27" });
+    console.log("Received token, paymentMethodId, userId:", token || '-', paymentMethodId, userId, stripe_env || '-', s_key_env);
+
+    const stripe = new Stripe(Deno.env.get(s_key_env) ?? "", { apiVersion: "2020-08-27" });
+
+    // Initialize Supabase client with the Service Role Key
+    const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
 
     // Create a new Stripe customer
     // const customer = await stripe.customers.create({
@@ -56,17 +61,15 @@ serve(async (req) => {
         invoice_settings: { default_payment_method: paymentMethodId },
       });
     } else {
-      // Create new customer
+
       const customer = await stripe.customers.create({
         payment_method: paymentMethodId,
         invoice_settings: { default_payment_method: paymentMethodId },
         description: `Customer for user ID: ${userId}`,
       });
-      customerId = customer.id;
+      console.log('step 2', customer)
+      customerId = customer?.id || '';
     }
-
-    // Initialize Supabase client with the Service Role Key
-    const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
 
     // Dates
     const startDate = new Date();
@@ -79,7 +82,7 @@ serve(async (req) => {
     // Update Supabase table
     const { data, error } = await supabase
       .from("users").update({
-        stripe_customer_id: customer.id,
+        stripe_customer_id: customerId,
         default_payment_method: paymentMethodId, // ✅ Save it
         start_date: formatDate(startDate),
         end_date: formatDate(endDate),
