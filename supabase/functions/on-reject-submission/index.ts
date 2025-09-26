@@ -25,7 +25,6 @@ serve(async (req) => {
 
   // 2. Initialize Supabase client with the service role key
   const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
-  const stripe = new Stripe(Deno.env.get("STRIPE_ASIM_TEST_KEY") ?? "", { apiVersion: "2020-08-27" });
 
   try {
     // Attempt to parse the request body
@@ -39,8 +38,7 @@ serve(async (req) => {
       });
     }
 
-    const { data: creator, error: creatorError } = await supabase.from("creators").select("id, stripe_account_id").eq("id", user.creator_id).single();
-    //if (!creator || !creator.stripe_account_id) return new Response(JSON.stringify({ error: "Creator or stripe_account_id not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const { data: creator, error: creatorError } = await supabase.from("creators").select("id, stripe_account_id, stripe_env").eq("id", user.creator_id).single();
 
     const { data: settings_list, error: settingsError } = await supabase.from("shares_settings").select("*");
 
@@ -49,11 +47,10 @@ serve(async (req) => {
 
     let shares_data = settings_list?.length ? settings_list[0] : {}
 
-
     const currentDate = new Date().toISOString().split('T')[0];
 
     // Step 3: Deduct penalty + record in DB
-    const paymentResult = await processPenalty(user, creator?.stripe_account_id || '', shares_data, currentDate);
+    const paymentResult = await processPenalty(user, creator, shares_data, currentDate);
 
     // Step 4: Insert penalty record regardless of Stripe success/failure
     const { error: insertError } = await supabase.from("payment_intents").insert({
@@ -189,33 +186,38 @@ function getHtmlTemplate(user, missedDate) {
  * Deducts $15 penalty from a user and records it in Supabase.
  * Returns { status: "completed" | "failed", transactionId?: string }
  */
-export async function processPenalty(user: any, stripe_account_id: any, shares_data: any, currentDate: string) {
+export async function processPenalty(user: any, creator: any, shares_data: any, currentDate: string) {
   let confirmedPayment = null;
   let paymentStatus = "failed";
   const amount = (shares_data?.charging_amount * 100) || 1500; // $15 fine in cents
 
   try {
-    const paymentIntentObj: any = {
+    let paymentIntentObj: any = {
       amount,
       currency: "usd",
       customer: user.stripe_customer_id,
       description: `Rejected submission fine for user ${user.id} on ${currentDate}`,
-      payment_method: "pm_card_visa", // ⚠️ testing only
+      payment_method: user.default_payment_method || "pm_card_visa",
       confirm: true,
     };
 
-    if (stripe_account_id) {
+    if (creator?.stripe_account_id) {
 
-      const platformCut = amount - Math.round(amount * (share_settings?.creator_share_percentage || 15) / 100);
+      const platformCut = amount - Math.round(amount * (shares_data?.creator_share_percentage || 15) / 100);
 
       paymentIntentObj.transfer_data = {
-        destination: stripe_account_id, // ✅ Creator’s Stripe Connect ID
+        destination: creator.stripe_account_id, // ✅ Creator’s Stripe Connect ID
       };
-      
+
       paymentIntentObj.application_fee_amount = platformCut; // ✅ Platform cut
 
     }
-    
+
+    let s_key_env = user.stripe_env || creator?.stripe_env || "STRIPE_ASIM_TEST_KEY";
+    const stripe = new Stripe(Deno.env.get(s_key_env) ?? "", { apiVersion: "2020-08-27" });
+
+    console.log(shares_data, paymentIntentObj, s_key_env)
+
     confirmedPayment = await stripe.paymentIntents.create(paymentIntentObj);
 
     console.log(`✅ Stripe payment successful. Txn: ${confirmedPayment.id}`);
