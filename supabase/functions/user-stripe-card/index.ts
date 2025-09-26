@@ -18,7 +18,8 @@ serve(async (req) => {
 
   // Combine CORS headers with content type for the main responses
   const headers = { ...corsHeaders, "Content-Type": "application/json" };
-
+  const stripe = new Stripe(Deno.env.get("STRIPE_ASIM_TEST_KEY") ?? "", { apiVersion: "2020-08-27" });
+  
   try {
     // Attempt to parse the request body
     const { token, userId } = await req.json();

@@ -14,14 +14,15 @@ serve(async (req) => {
   console.log('step1')
   try {
 
-    const { creatorId, email, stripe_account_id } = await req.json();
+    const { creatorId, email, stripe_account_id, stripe_env } = await req.json();
 
     if (!creatorId) {
       return new Response(JSON.stringify({ error: "creatorId required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-
+    let s_key_env = stripe_env || "STRIPE_ASIM_TEST_KEY";
+    console.log(s_key_env);
     const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
-    const stripe = new Stripe(Deno.env.get("STRIPE_ASIM_TEST_KEY") ?? "", { apiVersion: "2020-08-27" });
+    const stripe = new Stripe(Deno.env.get(s_key_env) ?? "", { apiVersion: "2020-08-27" });
 
     console.log('step2')
     let accountId = stripe_account_id;
@@ -36,11 +37,16 @@ serve(async (req) => {
 
       accountId = account?.id || '';
       console.log('step3', accountId)
+
+      const updates: any = {
+        stripe_account_status: account.status || null,
+        stripe_payouts_enabled: false,
+        stripe_charges_enabled: false,
+        stripe_env: s_key_env,
+        stripe_account_id: accountId
+      };
       // store account id in DB
-      const { error: updateErr } = await supabase
-        .from("creators")
-        .update({ stripe_account_id: accountId, stripe_account_status: account.status })
-        .eq("id", creatorId);
+      const { error: updateErr } = await supabase.from("creators").update(updates).eq("id", creatorId);
 
       if (updateErr) throw updateErr;
       console.log('step4')
@@ -59,7 +65,6 @@ serve(async (req) => {
 
     console.log('step5')
 
-    // Save onboard url till used (optional)
     await supabase.from("creators").update({ stripe_onboard_url: accountLink.url }).eq("id", creatorId);
     console.log('step6')
     return new Response(JSON.stringify({ url: accountLink.url, accountId }), {
@@ -72,3 +77,6 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: err.message || String(err) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
+
+
+//https://connect.stripe.com/d/setup/e/_T7l6AWs3HlZ4BwY1DJfDQIg5Yo/YWNjdF8xU0JEMlcwZmpGVkpGbEtr/2e91f5356e85ca29e

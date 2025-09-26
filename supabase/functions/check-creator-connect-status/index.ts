@@ -10,20 +10,27 @@ serve(async (req) => {
   console.log('step1')
   try {
 
-    const { creatorId, stripe_account_id } = await req.json();
+    const { creatorId, stripe_account_id, stripe_env } = await req.json();
     if (!creatorId) return new Response(JSON.stringify({ error: "creatorId required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     console.log('step2')
 
     const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
-    const stripe = new Stripe(Deno.env.get("STRIPE_ASIM_TEST_KEY") ?? "", { apiVersion: "2020-08-27" });
 
+    let s_key_env = stripe_env || "";
     let stripe_id = stripe_account_id || '';
+
     if (!stripe_id) {
       const { data: creator } = await supabase.from("creators").select("id, stripe_account_id").eq("id", creatorId).maybeSingle();
       console.log( 'step2.2', creator)
       if (!creator || !creator.stripe_account_id) return new Response(JSON.stringify({ error: "Creator or stripe_account_id not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      else { stripe_id = creator.stripe_account_id }
+      else { 
+        stripe_id = creator.stripe_account_id;
+        s_key_env = creator.stripe_env || "STRIPE_ASIM_TEST_KEY";
+      }
     }
+
+    console.log(s_key_env);
+    const stripe = new Stripe(Deno.env.get( s_key_env ) ?? "", { apiVersion: "2020-08-27" });
 
     console.log('step3')
     // retrieve Stripe account
