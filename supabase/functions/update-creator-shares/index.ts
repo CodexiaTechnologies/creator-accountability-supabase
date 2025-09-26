@@ -21,7 +21,7 @@ serve(async (req) => {
 
     const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
 
-    const { error: updateErr } = await supabase.from("creators").update({ creator_share_percentage: creator_share_percentage }).eq("id", '8de06f3c-ad57-44d8-8b04-6f536aaac2c5');
+    const { error: updateErr } = await supabase.from("shares_settings").update({ creator_share_percentage: creator_share_percentage }).eq("id", '8de06f3c-ad57-44d8-8b04-6f536aaac2c5');
     if (updateErr) throw updateErr;
 
     return new Response(JSON.stringify({ url: accountLink.url, accountId }), {

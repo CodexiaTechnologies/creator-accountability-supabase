@@ -18,7 +18,6 @@ serve(async (req) => {
 
   // 2. Initialize Supabase client with the service role key
   const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
-  const stripe = new Stripe(Deno.env.get("STRIPE_ASIM_TEST_KEY") ?? "", { apiVersion: "2020-08-27" });
 
   try {
     console.log("Starting daily challenge check...");
@@ -48,6 +47,14 @@ serve(async (req) => {
 
     // Step 1: Get active users
     // const { data: users, error: userError } = await getActiveUsers(currentDate, yesterdayDate);
+
+    const { data: settings_list, error: settingsError } = await supabase.from("shares_settings").select("*");
+    let shares_data = settings_list?.length ? settings_list[0] : {};
+
+    const { data: creatorsList, error: creatorError } = await supabase
+      .from("creators")
+      .select("id, stripe_account_id, stripe_env")
+      .not("stripe_account_id", "is", null)
 
     const { data: users, error: userError } = await supabase
       .from("users")
@@ -106,16 +113,20 @@ serve(async (req) => {
         continue;
       }
 
+      let creator = creatorsList?.find((x: any) => x.id == user.creator_id)
+
       // Step 3: Deduct penalty + record in DB
-      const paymentResult = await processPenalty(user, yesterdayDate);
+      const paymentResult = await processPenalty(user, creator, shares_data, yesterdayDate);
 
       // Step 4: Insert penalty record regardless of Stripe success/failure
       const { error: insertError } = await supabase.from("payment_intents").insert({
         user_id: user.id,
         stripe_customer_id: user.stripe_customer_id,
-        amount: 15.0,
+        stripe_account_id: creator?.stripe_account_id || '',
+        amount: shares_data?.charging_amount || 15.0,
         missed_date: yesterdayDate,
-        transaction_id: paymentResult?.transactionId || null,
+        transaction_data: paymentResult?.transaction ? JSON.stringify(paymentResult.transaction) : null ,
+        transaction_id: paymentResult?.transaction?.id || null,
         is_paid: paymentResult?.status === "completed",
         payment_status: paymentResult?.status || "Pending",
         remarks: "User missed the submission",
@@ -226,21 +237,40 @@ function getHtmlTemplate(user, missedDate) {
  * Deducts $15 penalty from a user and records it in Supabase.
  * Returns { status: "completed" | "failed", transactionId?: string }
  */
-export async function processPenalty(user: any, yesterdayDate: string) {
+export async function processPenalty(user: any, creator: any, shares_data: any, yesterdayDate: string) {
   let confirmedPayment = null;
   let paymentStatus = "failed";
+  const amount = (shares_data?.charging_amount * 100) || 1500; // $15 fine in cents
 
   try {
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: 1500,
+
+    let paymentIntentObj: any = {
+      amount,
       currency: "usd",
       customer: user.stripe_customer_id,
       description: `Missed submission fine for user ${user.id} on ${yesterdayDate}`,
-    });
+      payment_method: user.default_payment_method || "pm_card_visa",
+      confirm: true,
+    };
 
-    confirmedPayment = await stripe.paymentIntents.confirm(paymentIntent.id, {
-      payment_method: "pm_card_visa", // ⚠️ testing only
-    });
+    if (creator?.stripe_account_id) {
+
+      const platformCut = amount - Math.round(amount * (shares_data?.creator_share_percentage || 15) / 100);
+
+      paymentIntentObj.transfer_data = {
+        destination: creator.stripe_account_id, // ✅ Creator’s Stripe Connect ID
+      };
+
+      paymentIntentObj.application_fee_amount = platformCut; // ✅ Platform cut
+
+    }
+
+    let s_key_env = user.stripe_env || creator?.stripe_env || "STRIPE_ASIM_TEST_KEY";
+    const stripe = new Stripe(Deno.env.get(s_key_env) ?? "", { apiVersion: "2020-08-27" });
+
+    console.log(shares_data, paymentIntentObj, s_key_env)
+
+    confirmedPayment = await stripe.paymentIntents.create(paymentIntentObj);
 
     console.log(`✅ Stripe payment successful. Txn: ${confirmedPayment.id}`);
     paymentStatus = "completed";
@@ -251,7 +281,7 @@ export async function processPenalty(user: any, yesterdayDate: string) {
 
   return {
     status: paymentStatus,
-    transactionId: confirmedPayment?.id || null,
+    transactionId: confirmedPayment || null,
   };
 
 }

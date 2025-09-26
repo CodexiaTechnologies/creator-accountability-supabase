@@ -42,9 +42,6 @@ serve(async (req) => {
 
     const { data: settings_list, error: settingsError } = await supabase.from("shares_settings").select("*");
 
-    console.log('creator', creator, creatorError);
-    console.log('share setting', settings_list, settingsError);
-
     let shares_data = settings_list?.length ? settings_list[0] : {}
 
     const currentDate = new Date().toISOString().split('T')[0];
@@ -56,9 +53,11 @@ serve(async (req) => {
     const { error: insertError } = await supabase.from("payment_intents").insert({
       user_id: user.id,
       stripe_customer_id: user.stripe_customer_id,
-      amount: 15.0,
+      stripe_account_id: creator?.stripe_account_id || '',
+      amount: shares_data?.charging_amount || 15.0,
       missed_date: currentDate,
-      transaction_id: paymentResult?.transactionId || null,
+      transaction_data: paymentResult?.transaction ? JSON.stringify(paymentResult.transaction) : null ,
+      transaction_id: paymentResult?.transaction?.id || null,
       is_paid: paymentResult?.status === "completed",
       payment_status: paymentResult?.status || "Pending",
       remarks: "Admin rejected the submission",
@@ -66,8 +65,6 @@ serve(async (req) => {
 
     if (insertError) {
       console.error(`❌ Error inserting payment for ${user.id}`, insertError);
-    } else {
-      console.log(`💰 Payment record created for user ${user.id}`);
     }
 
     const SMTP = {
@@ -85,8 +82,6 @@ serve(async (req) => {
       }
     }
     const transporter = nodemailer.createTransport(SMTP);
-
-    console.log(`➡️ Checking user: ${user.id}, ${user.email}`);
 
     // Step 5: Send Email
     const userData = {
@@ -229,7 +224,7 @@ export async function processPenalty(user: any, creator: any, shares_data: any, 
 
   return {
     status: paymentStatus,
-    transactionId: confirmedPayment?.id || null,
+    transaction: confirmedPayment || null,
   };
 
 }
