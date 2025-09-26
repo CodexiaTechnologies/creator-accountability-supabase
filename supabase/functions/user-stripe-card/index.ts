@@ -18,14 +18,13 @@ serve(async (req) => {
 
   // Combine CORS headers with content type for the main responses
   const headers = { ...corsHeaders, "Content-Type": "application/json" };
-  const stripe = new Stripe(Deno.env.get("STRIPE_ASIM_TEST_KEY") ?? "", { apiVersion: "2020-08-27" });
-  
+
   try {
     // Attempt to parse the request body
-    const { token, userId } = await req.json();
+    const { token, paymentMethodId, userId, stripe_customer_id } = await req.json();
 
     // Input validation
-    if (!token) {
+    if (!token || !paymentMethodId) {
       return new Response(JSON.stringify({ error: "Missing token." }), {
         status: 400,
         headers: headers,
@@ -34,13 +33,37 @@ serve(async (req) => {
 
     console.log("Received token:", token, "Received userId:", userId);
 
-    // Create a new Stripe customer
-    const customer = await stripe.customers.create({
-      source: token,
-      description: `Customer for user ID: ${userId || "unknown"}`,
-    });
+    const stripe = new Stripe(Deno.env.get("STRIPE_ASIM_TEST_KEY") ?? "", { apiVersion: "2020-08-27" });
 
-    console.log("customer:", customer);
+    // Create a new Stripe customer
+    // const customer = await stripe.customers.create({
+    //   source: token,
+    //   description: `Customer for user ID: ${userId || "unknown"}`,
+    // });
+    // console.log("customer:", customer);
+
+    // Check if user already has a customer
+    let customerId: string;
+
+    if (stripe_customer_id) {
+      customerId = stripe_customer_id;
+
+      // Attach the payment method to existing customer
+      await stripe.paymentMethods.attach(paymentMethodId, { customer: customerId });
+
+      // Set as default
+      await stripe.customers.update(customerId, {
+        invoice_settings: { default_payment_method: paymentMethodId },
+      });
+    } else {
+      // Create new customer
+      const customer = await stripe.customers.create({
+        payment_method: paymentMethodId,
+        invoice_settings: { default_payment_method: paymentMethodId },
+        description: `Customer for user ID: ${userId}`,
+      });
+      customerId = customer.id;
+    }
 
     // Initialize Supabase client with the Service Role Key
     const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
@@ -57,6 +80,7 @@ serve(async (req) => {
     const { data, error } = await supabase
       .from("users").update({
         stripe_customer_id: customer.id,
+        default_payment_method: paymentMethodId, // ✅ Save it
         start_date: formatDate(startDate),
         end_date: formatDate(endDate),
         missed_days: 0,
@@ -65,11 +89,11 @@ serve(async (req) => {
 
     if (error) {
       console.error("Supabase update error:", error);
-      throw new Error("Failed to save customer ID to database.");
+      throw new Error("Failed to save customer ID to database.", userId);
     }
 
     // Return the new customer's ID
-    return new Response(JSON.stringify({ customerId: customer.id }), {
+    return new Response(JSON.stringify({ customerId, default_payment_method: paymentMethodId }), {
       status: 200,
       headers: headers,
     });
