@@ -121,12 +121,14 @@ serve(async (req) => {
       // Step 4: Insert penalty record regardless of Stripe success/failure
       const { error: insertError } = await supabase.from("payment_intents").insert({
         user_id: user.id,
+        creator_id: creator?.id,
         stripe_customer_id: user.stripe_customer_id,
         stripe_account_id: creator?.stripe_account_id || '',
         amount: shares_data?.charging_amount || 15.0,
         missed_date: yesterdayDate,
         transaction_data: paymentResult?.transaction ? JSON.stringify(paymentResult.transaction) : null ,
         transaction_id: paymentResult?.transaction?.id || null,
+        payment_method_id: user.default_payment_method || "",
         is_paid: paymentResult?.status === "completed",
         payment_status: paymentResult?.status || "Pending",
         remarks: "User missed the submission",
@@ -134,8 +136,6 @@ serve(async (req) => {
 
       if (insertError) {
         console.error(`❌ Error inserting payment for ${user.id}`, insertError);
-      } else {
-        console.log(`💰 Payment record created for user ${user.id}`);
       }
 
       // Step 5: Send Email
@@ -249,7 +249,7 @@ export async function processPenalty(user: any, creator: any, shares_data: any, 
       currency: "usd",
       customer: user.stripe_customer_id,
       description: `Missed submission fine for user ${user.id} on ${yesterdayDate}`,
-      payment_method: user.default_payment_method || "pm_card_visa",
+      payment_method: user.default_payment_method || "",
       confirm: true,
     };
 
@@ -281,7 +281,7 @@ export async function processPenalty(user: any, creator: any, shares_data: any, 
 
   return {
     status: paymentStatus,
-    transactionId: confirmedPayment || null,
+    transaction: confirmedPayment || null,
   };
 
 }

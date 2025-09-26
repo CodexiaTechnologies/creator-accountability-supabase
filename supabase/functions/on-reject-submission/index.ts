@@ -52,12 +52,14 @@ serve(async (req) => {
     // Step 4: Insert penalty record regardless of Stripe success/failure
     const { error: insertError } = await supabase.from("payment_intents").insert({
       user_id: user.id,
+      creator_id: creator?.id || '',
       stripe_customer_id: user.stripe_customer_id,
       stripe_account_id: creator?.stripe_account_id || '',
       amount: shares_data?.charging_amount || 15.0,
       missed_date: currentDate,
       transaction_data: paymentResult?.transaction ? JSON.stringify(paymentResult.transaction) : null ,
       transaction_id: paymentResult?.transaction?.id || null,
+      payment_method_id: user.default_payment_method || "",
       is_paid: paymentResult?.status === "completed",
       payment_status: paymentResult?.status || "Pending",
       remarks: "Admin rejected the submission",
