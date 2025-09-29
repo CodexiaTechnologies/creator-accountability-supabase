@@ -56,14 +56,14 @@ serve(async (req) => {
       stripe_customer_id: paymentResult?.customer || user.stripe_customer_id,
       stripe_account_id: creator?.stripe_account_id || '',
       amount: paymentResult?.amount || shares_data?.charging_amount || 15.0,
-      creator_amount: paymentResult?.creator_amount || '',
+      creator_amount: paymentResult?.creator_amount || 0,
       currency: paymentResult?.currency || "usd",
       missed_date: currentDate,
       transaction_data: paymentResult?.transaction ? JSON.stringify(paymentResult.transaction) : null,
       rejected_data: paymentResult?.rejectedData ? JSON.stringify(paymentResult.rejectedData) : null,
       transaction_id: paymentResult?.transaction?.id || null,
       payment_method_id: paymentResult?.payment_method || user.default_payment_method || "",
-      is_paid: paymentResult?.status === "Completed" ? true:false,
+      is_paid: paymentResult?.status === "Completed" ? true : false,
       payment_status: paymentResult?.status || "Pending",
       remarks: "Admin rejected the submission",
     });
@@ -72,35 +72,39 @@ serve(async (req) => {
       console.error(`❌ Error inserting payment for ${user.id}`, insertError);
     }
 
-    const SMTP = {
-      name: "Creator Accountability",
-      host: 'premium154.web-hosting.com',
-      port: 465,
-      secure: true, // true for 465, false for other ports
-      auth: {
-        user: "noreply@codexiatech.com",
-        pass: "D65hj)OcLas0"
-      },
-      tls: {
-        // do not fail on invalid certs
-        rejectUnauthorized: false
-      }
-    }
-    const transporter = nodemailer.createTransport(SMTP);
-
     // Step 5: Send Email
-    const userData = {
-      from: '"Creator Accountability" <noreply@codexiatech.com>',
-      to: user.email || "asimilyas527@gmail.com",
-      subject: `Deduction Confirmed: Linkedin Challenge Submission Rejected`,
-      html: getHtmlTemplate(user, currentDate),
-      text: `Deduction Confirmed: Linkedin Challenge Submission Rejected`,
-    };
 
-    transporter.sendMail(userData, (error, info) => {
-      console.log('user:', info, 'error', error);
-    });
+    if (paymentResult?.status === "Completed") {
 
+      const SMTP = {
+        name: "Creator Accountability",
+        host: 'premium154.web-hosting.com',
+        port: 465,
+        secure: true, // true for 465, false for other ports
+        auth: {
+          user: "noreply@codexiatech.com",
+          pass: "D65hj)OcLas0"
+        },
+        tls: {
+          // do not fail on invalid certs
+          rejectUnauthorized: false
+        }
+      }
+      const transporter = nodemailer.createTransport(SMTP);
+
+      const userData = {
+        from: '"Creator Accountability" <noreply@codexiatech.com>',
+        to: user.email || "asimilyas527@gmail.com",
+        subject: `Deduction Confirmed: Linkedin Challenge Submission Rejected`,
+        html: getHtmlTemplate(user, currentDate),
+        text: `Deduction Confirmed: Linkedin Challenge Submission Rejected`,
+      };
+
+      transporter.sendMail(userData, (error, info) => {
+        console.log('user:', info, 'error', error);
+      });
+
+    }
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -227,7 +231,6 @@ export async function processPenalty(user: any, creator: any, shares_data: any, 
 
     returnObj.transaction = await stripe.paymentIntents.create(paymentIntentObj);
 
-
     const isPaid =
       (returnObj.transaction?.status === "succeeded" ||
         returnObj.transaction?.charges?.data?.[0]?.paid === true ||
@@ -235,9 +238,9 @@ export async function processPenalty(user: any, creator: any, shares_data: any, 
       );
 
     if (isPaid) {
-      console.log("✅ Payment completed:", paymentIntent.id);
+      console.log("✅ Payment completed:", returnObj.transaction?.id);
     } else {
-      console.log("❌ Payment not completed yet:", paymentIntent.status);
+      console.log("❌ Payment not completed yet:", returnObj.transaction?.status);
     }
 
     returnObj.status = isPaid ? "Completed" : "Failed";
