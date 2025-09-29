@@ -53,14 +53,17 @@ serve(async (req) => {
     const { error: insertError } = await supabase.from("payment_intents").insert({
       user_id: user.id,
       creator_id: creator?.id || '',
-      stripe_customer_id: user.stripe_customer_id,
+      stripe_customer_id: paymentResult?.customer || user.stripe_customer_id,
       stripe_account_id: creator?.stripe_account_id || '',
-      amount: shares_data?.charging_amount || 15.0,
+      amount: paymentResult?.amount || shares_data?.charging_amount || 15.0,
+      creator_amount: paymentResult?.creator_amount || '',
+      currency: paymentResult?.currency || "usd",
       missed_date: currentDate,
-      transaction_data: paymentResult?.transaction ? JSON.stringify(paymentResult.transaction) : null ,
+      transaction_data: paymentResult?.transaction ? JSON.stringify(paymentResult.transaction) : null,
+      rejected_data: paymentResult?.rejectedData ? JSON.stringify(paymentResult.rejectedData) : null,
       transaction_id: paymentResult?.transaction?.id || null,
-      payment_method_id: user.default_payment_method || "",
-      is_paid: paymentResult?.status === "completed",
+      payment_method_id: paymentResult?.payment_method || user.default_payment_method || "",
+      is_paid: paymentResult?.status === "Completed" ? true:false,
       payment_status: paymentResult?.status || "Pending",
       remarks: "Admin rejected the submission",
     });
@@ -184,29 +187,36 @@ function getHtmlTemplate(user, missedDate) {
  * Returns { status: "completed" | "failed", transactionId?: string }
  */
 export async function processPenalty(user: any, creator: any, shares_data: any, currentDate: string) {
-  let confirmedPayment = null;
-  let paymentStatus = "failed";
-  const amount = (shares_data?.charging_amount * 100) || 1500; // $15 fine in cents
+
+  let returnObj: any = {
+    amount: (shares_data?.charging_amount || 15), // $15 fine in cents
+    status: "failed",
+    transaction: null,
+    rejectedData: null,
+    currency: "usd",
+    customer: user.stripe_customer_id,
+    payment_method: user.default_payment_method || "pm_card_visa",
+    description: `Rejected submission fine for user ${user.id} on ${currentDate}`,
+    creator_amount: (shares_data?.charging_amount || 15) * (shares_data?.creator_share_percentage || 15) / 100,
+  }
 
   try {
     let paymentIntentObj: any = {
-      amount,
-      currency: "usd",
-      customer: user.stripe_customer_id,
-      description: `Rejected submission fine for user ${user.id} on ${currentDate}`,
-      payment_method: user.default_payment_method || "pm_card_visa",
+      amount: returnObj.amount * 100,
+      currency: returnObj.currency,
+      customer: returnObj.customer,
+      description: returnObj.description,
+      payment_method: returnObj.payment_method,
       confirm: true,
     };
 
     if (creator?.stripe_account_id) {
 
-      const platformCut = amount - Math.round(amount * (shares_data?.creator_share_percentage || 15) / 100);
-
       paymentIntentObj.transfer_data = {
         destination: creator.stripe_account_id, // ✅ Creator’s Stripe Connect ID
       };
 
-      paymentIntentObj.application_fee_amount = platformCut; // ✅ Platform cut
+      paymentIntentObj.application_fee_amount = Math.round((returnObj.amount - returnObj.creator_amount) * 100); // ✅ Platform cut
 
     }
 
@@ -215,18 +225,28 @@ export async function processPenalty(user: any, creator: any, shares_data: any, 
 
     console.log(shares_data, paymentIntentObj, s_key_env)
 
-    confirmedPayment = await stripe.paymentIntents.create(paymentIntentObj);
+    returnObj.transaction = await stripe.paymentIntents.create(paymentIntentObj);
 
-    console.log(`✅ Stripe payment successful. Txn: ${confirmedPayment.id}`);
-    paymentStatus = "completed";
+
+    const isPaid =
+      (returnObj.transaction?.status === "succeeded" ||
+        returnObj.transaction?.charges?.data?.[0]?.paid === true ||
+        returnObj.transaction?.charges?.data?.[0]?.status === "succeeded"
+      );
+
+    if (isPaid) {
+      console.log("✅ Payment completed:", paymentIntent.id);
+    } else {
+      console.log("❌ Payment not completed yet:", paymentIntent.status);
+    }
+
+    returnObj.status = isPaid ? "Completed" : "Failed";
   } catch (err: any) {
     console.error(`❌ Stripe payment failed for user ${user.id}`, err.message);
-    paymentStatus = "failed"; // don't throw
+    returnObj.rejectedData = err;
+    returnObj.status = "Failed"; // don't throw
   }
 
-  return {
-    status: paymentStatus,
-    transaction: confirmedPayment || null,
-  };
+  return returnObj
 
 }
