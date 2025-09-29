@@ -31,7 +31,7 @@ serve(async (req) => {
       });
     }
 
-    let s_key_env = stripe_env || "STRIPE_ASIM_TEST_KEY";
+    let s_key_env = stripe_env || "STRIPE_TEST_KEY";
 
     console.log("Received token, paymentMethodId, userId:", token || '-', paymentMethodId, userId, stripe_env || '-', s_key_env);
 

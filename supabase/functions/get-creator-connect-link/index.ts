@@ -19,7 +19,7 @@ serve(async (req) => {
     if (!creatorId) {
       return new Response(JSON.stringify({ error: "creatorId required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    let s_key_env = stripe_env || "STRIPE_ASIM_TEST_KEY";
+    let s_key_env = stripe_env || "STRIPE_TEST_KEY";
     console.log(s_key_env);
     const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
     const stripe = new Stripe(Deno.env.get(s_key_env) ?? "", { apiVersion: "2020-08-27" });

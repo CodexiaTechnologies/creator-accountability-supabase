@@ -19,13 +19,13 @@ serve(async (req) => {
     let s_key_env = stripe_env || "";
     let stripe_id = stripe_account_id || '';
 
-    if (!stripe_id) {
-      const { data: creator } = await supabase.from("creators").select("id, stripe_account_id").eq("id", creatorId).maybeSingle();
+    if (!stripe_id || !s_key_env) {
+      const { data: creator } = await supabase.from("creators").select("id, stripe_account_id, stripe_env").eq("id", creatorId).maybeSingle();
       console.log( 'step2.2', creator)
       if (!creator || !creator.stripe_account_id) return new Response(JSON.stringify({ error: "Creator or stripe_account_id not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       else { 
         stripe_id = creator.stripe_account_id;
-        s_key_env = creator.stripe_env || "STRIPE_ASIM_TEST_KEY";
+        s_key_env = creator.stripe_env || "STRIPE_TEST_KEY";
       }
     }
 
