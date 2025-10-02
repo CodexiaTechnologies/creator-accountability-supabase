@@ -192,7 +192,7 @@ function getHtmlTemplate(user, missedDate) {
  */
 export async function processPenalty(user: any, creator: any, shares_data: any, currentDate: string) {
 
-  let returnObj: any = {
+  let stripePaymentData: any = {
     amount: (shares_data?.charging_amount || 15), // $15 fine in cents
     status: "failed",
     transaction: null,
@@ -205,51 +205,51 @@ export async function processPenalty(user: any, creator: any, shares_data: any, 
   }
 
   try {
-    let paymentIntentObj: any = {
-      amount: returnObj.amount * 100,
-      currency: returnObj.currency,
-      customer: returnObj.customer,
-      description: returnObj.description,
-      payment_method: returnObj.payment_method,
+    
+    let paymentIntent: any = {
+      amount: stripePaymentData.amount * 100,
+      currency: stripePaymentData.currency,
+      customer: stripePaymentData.customer,
+      description: stripePaymentData.description,
+      payment_method: stripePaymentData.payment_method,
       confirm: true,
     };
 
     if (creator?.stripe_account_id) {
 
-      paymentIntentObj.transfer_data = {
+      paymentIntent.transfer_data = {
         destination: creator.stripe_account_id, // ✅ Creator’s Stripe Connect ID
       };
 
-      paymentIntentObj.application_fee_amount = Math.round((returnObj.amount - returnObj.creator_amount) * 100); // ✅ Platform cut
+      paymentIntent.application_fee_amount = Math.round((stripePaymentData.amount - stripePaymentData.creator_amount) * 100); 
+      // ✅ Platform cut
 
     }
 
     let s_key_env = user.stripe_env || creator?.stripe_env || "STRIPE_TEST_KEY";
     const stripe = new Stripe(Deno.env.get(s_key_env) ?? "", { apiVersion: "2020-08-27" });
 
-    console.log(shares_data, paymentIntentObj, s_key_env)
-
-    returnObj.transaction = await stripe.paymentIntents.create(paymentIntentObj);
+    stripePaymentData.transaction = await stripe.paymentIntents.create(paymentIntentObj);
 
     const isPaid =
-      (returnObj.transaction?.status === "succeeded" ||
-        returnObj.transaction?.charges?.data?.[0]?.paid === true ||
-        returnObj.transaction?.charges?.data?.[0]?.status === "succeeded"
+      (stripePaymentData.transaction?.status === "succeeded" ||
+        stripePaymentData.transaction?.charges?.data?.[0]?.paid === true ||
+        stripePaymentData.transaction?.charges?.data?.[0]?.status === "succeeded"
       );
 
     if (isPaid) {
-      console.log("✅ Payment completed:", returnObj.transaction?.id);
+      console.log("✅ Payment completed:", stripePaymentData.transaction?.id);
     } else {
-      console.log("❌ Payment not completed yet:", returnObj.transaction?.status);
+      console.log("❌ Payment not completed yet:", stripePaymentData.transaction?.status);
     }
 
-    returnObj.status = isPaid ? "Completed" : "Failed";
+    stripePaymentData.status = isPaid ? "Completed" : "Failed";
   } catch (err: any) {
     console.error(`❌ Stripe payment failed for user ${user.id}`, err.message);
-    returnObj.rejectedData = err;
-    returnObj.status = "Failed"; // don't throw
+    stripePaymentData.rejectedData = err;
+    stripePaymentData.status = "Failed"; // don't throw
   }
 
-  return returnObj
+  return transactionData
 
 }

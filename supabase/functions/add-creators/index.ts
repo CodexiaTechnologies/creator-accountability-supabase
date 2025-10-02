@@ -41,6 +41,7 @@ serve(async (req) => {
     const { data: creatorData, error: dbError } = await supabase.from("creators").insert({
       auth_user_id: newUser.id,
       email,
+      stripe_env: 'STRIPE_TEST_KEY',
       bio: bio || '',
       full_name,
       creator_url_id: creator_slug
@@ -70,6 +71,7 @@ serve(async (req) => {
     });
   }
 });
+
 function generateCreatorSlug(full_name, email, serial) {
   let base = "";
   if (full_name && full_name.trim().length > 0) {
@@ -81,6 +83,7 @@ function generateCreatorSlug(full_name, email, serial) {
   base = base.replace(/[\s.]+/g, "_");
   return `${base}_${serial}`;
 }
+
 function sendEmailToCreator(full_name, email, url_id, pass) {
   const SMTP = {
     name: "Creator Accountability",
@@ -109,6 +112,7 @@ function sendEmailToCreator(full_name, email, url_id, pass) {
     console.log('user:', info, 'error', error);
   });
 }
+
 function getHtmlTemplate(full_name, email, url_id, pass) {
   const emailHtml = `
     <!DOCTYPE html>
