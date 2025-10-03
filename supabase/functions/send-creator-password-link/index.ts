@@ -15,7 +15,7 @@ serve(async (req) => {
   }
   try {
     const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
-    const { email } = await req.json();
+    const { email, role, redirectUrl } = await req.json();
     if (!email) {
       return new Response(JSON.stringify({
         error: "Email is required"
@@ -27,13 +27,69 @@ serve(async (req) => {
         }
       });
     }
-    // ✅ Step 1: Check if user exists in Auth
-    const { data: users, error: userError } = await supabase.auth.admin.listUsers();
-    if (userError) throw userError;
-    const user = users?.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
-    if (!user) {
+
+    // const { data: users, error: userError } = await supabase.auth.admin.listUsers();
+    // if (userError) throw userError;
+    // const user = users?.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+    // if (!user) {
+    //   return new Response(JSON.stringify({
+    //     error: "No account found with this email"
+    //   }), {
+    //     status: 404,
+    //     headers: {
+    //       ...corsHeaders,
+    //       "Content-Type": "application/json"
+    //     }
+    //   });
+    // }
+
+    // ------------------------------------------
+    // ✅ Step 1: Check if user exists in Auth (Updated for efficiency)
+    // ------------------------------------------
+
+    // ⚠️ We must first find the user's UUID using their email.
+    // The `admin.getUserByEmail` method is more efficient than `admin.listUsers`.
+    const { data: userData, error: userLookupError } = await supabase.auth.admin.getUserByEmail(email);
+
+    if (userLookupError || !userData?.user) {
+      // Check specifically for 'User not found' error. Supabase's GoTrue might return a 404.
+      if (userLookupError.status === 404 || !userData?.user) {
+        return new Response(JSON.stringify({
+          error: "No account found with this email"
+        }), {
+          status: 404,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json"
+          }
+        });
+      }
+      // For any other lookup error, throw it.
+      throw userLookupError;
+    }
+
+    const user = userData.user;
+    console.log(user);
+
+    // ------------------------------------------
+    // ✅ Step 2: Check for valid Admin/Creator role in the public schema
+    // ------------------------------------------
+
+    const table = role === 'Admin' ? "admins" : "creators";
+    const emailColumn = role === 'Admin' ? "id" : "auth_user_id"; // Assuming admins table uses the auth UUID as its primary key 'id' and creators uses 'auth_user_id'
+
+    const { data: userTableData, error: userTableError } = await supabase.from(table)
+      .select("id, email") // Select relevant columns
+      .eq(emailColumn, user.id) // Use the user's UUID (user.id) from the auth lookup
+      .single();
+
+    if (userTableError && userTableError.code !== 'PGRST116') { // PGRST116 is "No rows found"
+      throw userTableError;
+    }
+
+    if (!userTableData) {
       return new Response(JSON.stringify({
-        error: "No account found with this email"
+        error: "No account found with this email for " + (role === 'Admin' ? "Admin" : "Creator")
       }), {
         status: 404,
         headers: {
@@ -42,16 +98,26 @@ serve(async (req) => {
         }
       });
     }
+
+    let userRedirectUrl = redirectUrl || '';
+    if ((!role && !redirectUrl) || role == 'Creator') {
+      userRedirectUrl = "https://cpanel-creator-accountability.web.app/update-password";
+    } else if (role == 'Admin') {
+      userRedirectUrl = "https://admin-creator-accountability.web.app/update-password";
+    }
+
     // ✅ Step 2: Generate password reset (recovery) link
     const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
       type: "recovery",
       email,
       options: {
-        redirectTo: "https://cpanel-creator-accountability.web.app/update-password"
+        redirectTo: userRedirectUrl,
       }
     });
+
     if (linkError) throw linkError;
-    const resetLink = linkData?.properties?.action_link || "https://cpanel-creator-accountability.web.app/update-password";
+    const resetLink = linkData?.properties?.action_link || userRedirectUrl;
+
     if (!resetLink) {
       return new Response(JSON.stringify({
         error: "Failed to generate reset link"
