@@ -30,6 +30,13 @@ serve(async (req) => {
     const currentDate = new Date().toISOString().split('T')[0];
     const isMonday = new Date().getDay() === 1; // 1 = Monday (Day after Sunday end)
 
+    // const isFriday = new Date().getDay() === 5; // 1 = Monday (Day after Sunday end)
+    // console.log('is Friday', isFriday)
+    // if (isFriday) {
+    //   await handleWeeklyPayout(supabase);
+    // }
+    // return new Response(JSON.stringify({ success: true, rewardPerUser:0 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
     const SMTP = {
       name: "Creator Accountability",
       host: 'premium154.web-hosting.com',
@@ -47,9 +54,6 @@ serve(async (req) => {
     const transporter = nodemailer.createTransport(SMTP);
 
     // Step 1: Get active users
-    // const { data: users, error: userError } = await getActiveUsers(currentDate, yesterdayDate);
-
-
     // 1. Fetch Users and Submissions
     const { data: users } = await supabase.from("users").select("*").eq("is_active", true);
     const { data: submissions } = await supabase.from("user_post_submissions")
@@ -162,7 +166,7 @@ serve(async (req) => {
       let newStats = {
         user_id: user.id,
         current_streak: isMisser ? 0 : (currentStats?.current_streak || 0),
-        highest_streak:  currentStats?.highest_streak || currentStats?.current_streak || 0,
+        highest_streak: currentStats?.highest_streak || currentStats?.current_streak || 0,
         current_week_streak: isMisser ? 0 : (currentStats?.current_week_streak || 0),
         total_money_lost: isMisser ? (currentStats?.total_money_lost || 0) + FINE_AMOUNT : (currentStats?.total_money_lost || 0),
         current_week_pending_rewards: isEarner ? (currentStats?.current_week_pending_rewards || 0) + rewardPerUser : (currentStats?.current_week_pending_rewards || 0),
@@ -178,7 +182,7 @@ serve(async (req) => {
 
     // 6. Weekly Payout Logic (Runs on Monday morning for previous week)
     if (isMonday) {
-      await handleWeeklyPayout(supabase, stripeDefault);
+      await handleWeeklyPayout(supabase);
     }
 
     return new Response(JSON.stringify({ success: true, rewardPerUser }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -190,16 +194,76 @@ serve(async (req) => {
 });
 
 
-async function handleWeeklyPayout(supabase: any, stripe: any) {
-  const { data: stats } = await supabase.from("user_stats").select("*, users(email, stripe_account_id)").gt("current_week_pending_rewards", 0);
+async function handleWeeklyPayout(supabase: any) {
+  console.log("Processing Monday Payouts...");
+
+  // 1. Fetch users who have either weekly earnings or a previously pending balance
+  const { data: stats, error } = await supabase
+    .from("user_stats")
+    .select(`
+      user_id,
+      current_week_pending_rewards,
+      pending_withdrawal_balance,
+      users ( email, stripe_account_id, stripe_env )
+    `)
+    // Select anyone with money owed
+    .or('current_week_pending_rewards.gt.0,pending_withdrawal_balance.gt.0');
+
+  if (error) {
+    console.error("Error fetching stats for payout:", error);
+    return;
+  }
+
+  console.log('STATS 1.1', stats?.length || 0)
 
   for (const stat of stats || []) {
-    // Logic for transferring 'current_week_pending_rewards' to user via Stripe Connect
-    // After transfer success:
+    const weeklyEarned = Number(stat.current_week_pending_rewards) || 0;
+    const previousPending = Number(stat.pending_withdrawal_balance) || 0;
+    const totalToTransfer = weeklyEarned + previousPending;
+    const stripeAccountId = stat.users?.stripe_account_id;
+    let transferSuccessful = false;
+
+    console.log('STATS 1.2', stripeAccountId || '---', totalToTransfer || 0)
+
+    // 2. Attempt Stripe Transfer if Account ID exists
+    if (stripeAccountId && totalToTransfer > 0) {
+      try {
+        let s_key_env = stat.users.stripe_env || "STRIPE_TEST_KEY";
+        const stripe = new Stripe(Deno.env.get(s_key_env) ?? "", { apiVersion: "2020-08-27" });
+
+        const transferData = await stripe.transfers.create({
+          amount: Math.round(totalToTransfer * 100), // Convert to cents
+          currency: "usd",
+          destination: stripeAccountId,
+          description: `Weekly reward payout for ${stat.users.email}`,
+        });
+
+        console.log(stat.users.email, transferData)
+
+        let isPaid = (transferData?.status === "succeeded" ||
+          transferData?.charges?.data?.[0]?.paid === true ||
+          transferData?.charges?.data?.[0]?.status === "succeeded");
+
+        transferSuccessful = isPaid ? true : false;
+
+        // if (transfer.id) {
+        console.log(`✅ Successfully transferred $${totalToTransfer} to ${stat.users.email}`);
+        transferSuccessful = true;
+        // }
+      } catch (err) {
+        console.error(`❌ Stripe Transfer failed for ${stat.users.email}:`, err.message);
+        // transferSuccessful remains false
+      }
+    } else {
+      console.log(`⚠️ User ${stat.users.email} has no Stripe Account ID. Moving to pending balance.`);
+    }
+
     await supabase.from("user_stats").update({
+      pending_withdrawal_balance: transferSuccessful ? 0 : totalToTransfer,
       current_week_pending_rewards: 0,
       current_week_streak: 0
     }).eq("user_id", stat.user_id);
+    console.log('STATS 1.3');
   }
 }
 
