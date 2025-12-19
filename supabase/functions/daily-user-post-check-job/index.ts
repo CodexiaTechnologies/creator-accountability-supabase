@@ -18,6 +18,7 @@ serve(async (req) => {
 
   // 2. Initialize Supabase client with the service role key
   const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
+  const stripeDefault = new Stripe(Deno.env.get("STRIPE_TEST_KEY") ?? "", { apiVersion: "2020-08-27" });
 
   try {
     console.log("Starting daily challenge check...");
@@ -27,7 +28,7 @@ serve(async (req) => {
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayDate = yesterday.toISOString().split('T')[0];
     const currentDate = new Date().toISOString().split('T')[0];
-
+    const isMonday = new Date().getDay() === 1; // 1 = Monday (Day after Sunday end)
 
     const SMTP = {
       name: "Creator Accountability",
@@ -48,133 +49,160 @@ serve(async (req) => {
     // Step 1: Get active users
     // const { data: users, error: userError } = await getActiveUsers(currentDate, yesterdayDate);
 
-    const { data: settings_list, error: settingsError } = await supabase.from("shares_settings").select("*");
-    let shares_data = settings_list?.length ? settings_list[0] : {};
 
-    const { data: creatorsList, error: creatorError } = await supabase
-      .from("creators")
-      .select("id, stripe_account_id, stripe_env")
-      .not("stripe_account_id", "is", null)
-
-    const { data: users, error: userError } = await supabase
-      .from("users")
+    // 1. Fetch Users and Submissions
+    const { data: users } = await supabase.from("users").select("*").eq("is_active", true);
+    const { data: submissions } = await supabase.from("user_post_submissions")
       .select("*")
-      .not("stripe_customer_id", "is", null)
-      .not("start_date", "is", null)
-      .not("is_completed", "is", true)
-    // .lte("start_date", currentDate)
-    // .gte("end_date", yesterdayDate);
+      .gte("created_at", `${yesterdayDate}T00:00:00.000Z`)
+      .lte("created_at", `${yesterdayDate}T23:59:59.999Z`);
 
-    if (userError) throw userError;
+    const { data: settings } = await supabase.from("shares_settings").select("*").single();
+    const FINE_AMOUNT = settings?.charging_amount || 20;
 
-    console.log(`👤 Found ${users?.length || 0} active users`);
+    let totalFinesCollected = 0;
+    const earners: any[] = [];
+    const missers: any[] = [];
 
+    // 2. Sort Users (Earnings are Card-Only, Streaks are for Everyone)
     for (const user of users || []) {
-      console.log(`➡️ Checking user: ${user.id}, ${user.email}`);
-
-      // 🛑 Check if challenge ended
-      if (new Date(currentDate) > new Date(user.end_date)) {
-
-        const { error: completeError } = await supabase.from("users").update({ is_completed: true }).eq("id", user.id);
-
-        if (completeError) {
-          console.error(`❌ Error updating user ${user.id} to completed`, completeError);
-        } else {
-          console.log(`🏁 Marked user ${user.id} as completed`);
-        }
-
+      const hasCard = !!user.stripe_customer_id;
+      if (hasCard) {
+        const submission = submissions?.find(s => s.user_id === user.id && s.status !== 'rejected');
+        if (submission) earners.push(user);
+        else missers.push(user);
       }
-
-      // Step 2: Check payment_intents
-      const { data: paymentExists, error: paymentError } = await supabase
-        .from("payment_intents").select("id")
-        .eq("user_id", user.id).eq("missed_date", yesterdayDate).maybeSingle();
-
-      if (paymentError) throw paymentError;
-      if (paymentExists) {
-        console.log(`✅ Payment already exists for ${user.id}`);
-        continue;
-      }
-
-      // Step 3: Check submissions
-      const { data: submissions, error: submissionError } = await supabase
-        .from("user_post_submissions").select("id, status, created_at")
-        .eq("user_id", user.id)
-        .gte("created_at", `${yesterdayDate}T00:00:00.000Z`)
-        .lte("created_at", `${yesterdayDate}T23:59:59.999Z`);
-      if (submissionError) throw submissionError;
-
-      const validSubmission = submissions?.some(
-        (s) => s.status && s.status.toLowerCase() !== "rejected"
-      );
-
-      if (validSubmission) {
-        console.log(`✅ User ${user.id} has a valid submission`);
-        continue;
-      }
-
-      let creator = creatorsList?.find((x: any) => x.id == user.creator_id)
-
-      // Step 3: Deduct penalty + record in DB
-      const paymentResult = await processPenalty(user, creator, shares_data, yesterdayDate);
-
-      // Step 4: Insert penalty record regardless of Stripe success/failure
-      const { error: insertError } = await supabase.from("payment_intents").insert({
-        user_id: user.id,
-        creator_id: creator?.id || '',
-        stripe_customer_id: paymentResult?.customer || user.stripe_customer_id,
-        stripe_account_id: creator?.stripe_account_id || '',
-        amount: paymentResult?.amount || shares_data?.charging_amount || 15.0,
-        creator_amount: paymentResult?.creator_amount || 0,
-        currency: paymentResult?.currency || "usd",
-        missed_date: currentDate,
-        transaction_data: paymentResult?.transaction ? JSON.stringify(paymentResult.transaction) : null,
-        rejected_data: paymentResult?.rejectedData ? JSON.stringify(paymentResult.rejectedData) : null,
-        transaction_id: paymentResult?.transaction?.id || null,
-        payment_method_id: paymentResult?.payment_method || user.default_payment_method || "",
-        is_paid: paymentResult?.status === "Completed" ? true : false,
-        payment_status: paymentResult?.status || "Pending",
-        remarks: "User missed the submission",
-      });
-
-      if (insertError) {
-        console.error(`❌ Error inserting payment for ${user.id}`, insertError);
-      }
-
-      // Step 5: Send Email
-
-      if (paymentResult?.status === "Completed") {
-        const userData = {
-          from: '"Creator Accountability" <noreply@codexiatech.com>',
-          to: user.email || "asimilyas527@gmail.com",
-          subject: `Deduction Confirmed: Missed Linkedin Challenge Submission`,
-          html: getHtmlTemplate(user, yesterdayDate),
-          text: `Deduction Confirmed: Missed Linkedin Challenge Submission`,
-        };
-
-        transporter.sendMail(userData, (error, info) => {
-          console.log('user:', info, 'error', error);
-        });
-      }
-
     }
 
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    for (const user of missers) {
+      const { data: paymentExists } = await supabase.from("payment_intents")
+        .select("id").eq("user_id", user.id).eq("missed_date", yesterdayDate).maybeSingle();
+      console.log(user.email, paymentExists, paymentError)
+      if (!paymentExists) {
+        let isPaid = false, paymentData = null, rejectedData = null;
+        try {
+          let s_key_env = user.stripe_env || "STRIPE_TEST_KEY";
+          const stripe = new Stripe(Deno.env.get(s_key_env) ?? "", { apiVersion: "2020-08-27" });
+
+          paymentData = await userStripe.paymentIntents.create({
+            amount: FINE_AMOUNT * 100,
+            currency: 'usd',
+            customer: user.stripe_customer_id,
+            payment_method: user.default_payment_method,
+            confirm: true,
+            off_session: true,
+            description: `Rejected submission fine for user ${user.id} on ${yesterdayDate}`,
+          });
+          console.log(user.email, paymentData)
+
+          isPaid = (paymentData?.status === "succeeded" ||
+            paymentData?.charges?.data?.[0]?.paid === true ||
+            paymentData?.charges?.data?.[0]?.status === "succeeded");
+
+        } catch (err) {
+          rejectedData = err;
+        }
+
+        await supabase.from("payment_intents").insert({
+          user_id: user.id,
+          amount: FINE_AMOUNT,
+          is_paid: isPaid,
+          payment_status: isPaid ? "Completed" : "Failed",
+          missed_date: yesterdayDate,
+          remarks: "Missed submission fine",
+          creator_id: '',
+          stripe_customer_id: user.stripe_customer_id,
+          stripe_account_id: '',
+          creator_amount: 0,
+          currency: "usd",
+          transaction_data: paymentData ? JSON.stringify(paymentData) : null,
+          rejected_data: rejectedData ? JSON.stringify(rejectedData) : null,
+          transaction_id: paymentData?.id || null,
+          payment_method_id: user.default_payment_method || "",
+        });
+
+        if (isPaid) {
+          totalFinesCollected += FINE_AMOUNT;
+          const userData = {
+            from: '"Creator Accountability" <noreply@codexiatech.com>',
+            to: user.email || "asimilyas527@gmail.com",
+            subject: `Deduction Confirmed: Missed Linkedin Challenge Submission`,
+            html: getHtmlTemplate(user, yesterdayDate, FINE_AMOUNT),
+            text: `Deduction Confirmed: Missed Linkedin Challenge Submission`,
+          };
+
+          transporter.sendMail(userData, (error, info) => {
+            console.log('user:', info, 'error', error);
+          });
+        }
+      }
+    }
+
+    // 4. Calculate Daily Reward Pool
+    const rewardPool = totalFinesCollected * 0.8;
+    const rewardPerUser = earners.length > 0 ? (rewardPool / earners.length) : 0;
+
+    // Record the daily pot state
+    await supabase.from("daily_pot_records").insert({
+      record_date: yesterdayDate,
+      total_fines_collected: totalFinesCollected,
+      reward_pool_amount: rewardPool,
+      eligible_winners_count: earners.length,
+      reward_per_user: rewardPerUser
     });
 
+    // 5. Update User Stats & Leaderboard Data
+    for (const user of users || []) {
+      const isEarner = earners.some(e => e.id === user.id);
+      const isMisser = missers.some(m => m.id === user.id);
+      const submitted = submissions?.some(s => s.user_id === user.id && s.status !== 'rejected');
+
+      const { data: currentStats } = await supabase.from("user_stats").select("*").eq("user_id", user.id).maybeSingle();
+
+      const newStats = {
+        user_id: user.id,
+        current_streak: submitted ? (currentStats?.current_streak || 0) + 1 : 0,
+        current_week_streak: submitted ? (currentStats?.current_week_streak || 0) + 1 : 0,
+        total_money_lost: isMisser ? (currentStats?.total_money_lost || 0) + FINE_AMOUNT : (currentStats?.total_money_lost || 0),
+        current_week_pending_rewards: isEarner ? (currentStats?.current_week_pending_rewards || 0) + rewardPerUser : (currentStats?.current_week_pending_rewards || 0),
+        total_money_earned: isEarner ? (currentStats?.total_money_earned || 0) + rewardPerUser : (currentStats?.total_money_earned || 0),
+      };
+
+      if (newStats.current_streak > (currentStats?.highest_streak || 0)) {
+        newStats.highest_streak = newStats.current_streak;
+      }
+
+      await supabase.from("user_stats").upsert(newStats);
+    }
+
+    // 6. Weekly Payout Logic (Runs on Monday morning for previous week)
+    if (isMonday) {
+      await handleWeeklyPayout(supabase, stripeDefault);
+    }
+
+    return new Response(JSON.stringify({ success: true, rewardPerUser }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (err: any) {
     console.error("An unexpected error occurred:", err);
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
   }
 });
 
 
-function getHtmlTemplate(user, missedDate) {
+async function handleWeeklyPayout(supabase: any, stripe: any) {
+  const { data: stats } = await supabase.from("user_stats").select("*, users(email, stripe_account_id)").gt("current_week_pending_rewards", 0);
+
+  for (const stat of stats || []) {
+    // Logic for transferring 'current_week_pending_rewards' to user via Stripe Connect
+    // After transfer success:
+    await supabase.from("user_stats").update({
+      current_week_pending_rewards: 0,
+      current_week_streak: 0
+    }).eq("user_id", stat.user_id);
+  }
+}
+
+function getHtmlTemplate(user, missedDate, FINE_AMOUNT) {
 
   const missedDateObj = new Date(missedDate);
   const formattedDate = missedDateObj.toLocaleDateString("en-US", {
@@ -216,7 +244,7 @@ function getHtmlTemplate(user, missedDate) {
             <div class="content">
                 <p>Hello ${user.name},</p>
                 <p>This email is to inform you that you have missed your daily submission for the LinkedIn challenge on <b>${formattedDate}</b>.</p>
-                <p>As per the challenge rules, a penalty of <b>$15</b> has been deducted from your Stripe account. The transaction has been recorded, and you can view the details in your dashboard.</p>
+                <p>As per the challenge rules, a penalty of <b>${FINE_AMOUNT || '20'}</b> has been deducted from your Stripe account. The transaction has been recorded, and you can view the details in your dashboard.</p>
                 <div class="details">
                     <h2>Action Required:</h2>
                     <p>To avoid any further deductions, please ensure you submit today's post and comment URLs.</p>
@@ -236,70 +264,4 @@ function getHtmlTemplate(user, missedDate) {
   `;
 
   return emailHtml;
-}
-
-
-/**
- * Deducts $15 penalty from a user and records it in Supabase.
- * Returns { status: "completed" | "failed", transactionId?: string }
- */
-export async function processPenalty(user: any, creator: any, shares_data: any, yesterdayDate: string) {
-
-  let returnObj: any = {
-    amount: (shares_data?.charging_amount || 15), // $15 fine in cents
-    status: "failed",
-    transaction: null,
-    rejectedData: null,
-    currency: "usd",
-    customer: user.stripe_customer_id,
-    payment_method: user.default_payment_method || "pm_card_visa",
-    description: `Rejected submission fine for user ${user.id} on ${yesterdayDate}`,
-    creator_amount: (shares_data?.charging_amount || 15) * (shares_data?.creator_share_percentage || 15) / 100,
-  }
-
-  try {
-    let paymentIntentObj: any = {
-      amount: returnObj.amount * 100,
-      currency: returnObj.currency,
-      customer: returnObj.customer,
-      description: returnObj.description,
-      payment_method: returnObj.payment_method,
-      confirm: true,
-    };
-
-    if (creator?.stripe_account_id) {
-      paymentIntentObj.transfer_data = {
-        destination: creator.stripe_account_id, // ✅ Creator’s Stripe Connect ID
-      };
-      paymentIntentObj.application_fee_amount = Math.round((returnObj.amount - returnObj.creator_amount) * 100); // ✅ Platform cut
-    }
-
-    let s_key_env = user.stripe_env || creator?.stripe_env || "STRIPE_TEST_KEY";
-    const stripe = new Stripe(Deno.env.get(s_key_env) ?? "", { apiVersion: "2020-08-27" });
-
-    console.log(shares_data, paymentIntentObj, s_key_env)
-
-    returnObj.transaction = await stripe.paymentIntents.create(paymentIntentObj);
-
-    const isPaid =
-      (returnObj.transaction?.status === "succeeded" ||
-        returnObj.transaction?.charges?.data?.[0]?.paid === true ||
-        returnObj.transaction?.charges?.data?.[0]?.status === "succeeded"
-      );
-
-    if (isPaid) {
-      console.log("✅ Payment completed:", returnObj.transaction?.id);
-    } else {
-      console.log("❌ Payment not completed yet:", returnObj.transaction?.status);
-    }
-
-    returnObj.status = isPaid ? "Completed" : "Failed";
-  } catch (err: any) {
-    console.error(`❌ Stripe payment failed for user ${user.id}`, err.message);
-    returnObj.rejectedData = err;
-    returnObj.status = "Failed"; // don't throw
-  }
-
-  return returnObj;
-
 }

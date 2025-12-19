@@ -28,47 +28,21 @@ serve(async (req) => {
       });
     }
 
-    // const { data: users, error: userError } = await supabase.auth.admin.listUsers();
-    // if (userError) throw userError;
-    // const user = users?.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
-    // if (!user) {
-    //   return new Response(JSON.stringify({
-    //     error: "No account found with this email"
-    //   }), {
-    //     status: 404,
-    //     headers: {
-    //       ...corsHeaders,
-    //       "Content-Type": "application/json"
-    //     }
-    //   });
-    // }
-
-    // ------------------------------------------
-    // ✅ Step 1: Check if user exists in Auth (Updated for efficiency)
-    // ------------------------------------------
-
-    // ⚠️ We must first find the user's UUID using their email.
-    // The `admin.getUserByEmail` method is more efficient than `admin.listUsers`.
-    const { data: userData, error: userLookupError } = await supabase.auth.admin.getUserByEmail(email);
-
-    if (userLookupError || !userData?.user) {
-      // Check specifically for 'User not found' error. Supabase's GoTrue might return a 404.
-      if (userLookupError.status === 404 || !userData?.user) {
-        return new Response(JSON.stringify({
-          error: "No account found with this email"
-        }), {
-          status: 404,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json"
-          }
-        });
-      }
-      // For any other lookup error, throw it.
-      throw userLookupError;
+    const { data: users, error: userError } = await supabase.auth.admin.listUsers();
+    if (userError) throw userError;
+    const user = users?.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+    if (!user || !user?.id) {
+      return new Response(JSON.stringify({
+        error: "No account found with this email"
+      }), {
+        status: 404,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json"
+        }
+      });
     }
 
-    const user = userData.user;
     console.log(user);
 
     // ------------------------------------------
