@@ -77,14 +77,14 @@ serve(async (req) => {
     for (const user of missers) {
       const { data: paymentExists } = await supabase.from("payment_intents")
         .select("id").eq("user_id", user.id).eq("missed_date", yesterdayDate).maybeSingle();
-      console.log(user.email, paymentExists, paymentError)
+      console.log(user.email, paymentExists)
       if (!paymentExists) {
         let isPaid = false, paymentData = null, rejectedData = null;
         try {
           let s_key_env = user.stripe_env || "STRIPE_TEST_KEY";
           const stripe = new Stripe(Deno.env.get(s_key_env) ?? "", { apiVersion: "2020-08-27" });
 
-          paymentData = await userStripe.paymentIntents.create({
+          paymentData = await stripe.paymentIntents.create({
             amount: FINE_AMOUNT * 100,
             currency: 'usd',
             customer: user.stripe_customer_id,
@@ -159,10 +159,11 @@ serve(async (req) => {
 
       const { data: currentStats } = await supabase.from("user_stats").select("*").eq("user_id", user.id).maybeSingle();
 
-      const newStats = {
+      let newStats = {
         user_id: user.id,
-        current_streak: submitted ? (currentStats?.current_streak || 0) + 1 : 0,
-        current_week_streak: submitted ? (currentStats?.current_week_streak || 0) + 1 : 0,
+        current_streak: isMisser ? 0 : (currentStats?.current_streak || 0),
+        highest_streak:  currentStats?.highest_streak || currentStats?.current_streak || 0,
+        current_week_streak: isMisser ? 0 : (currentStats?.current_week_streak || 0),
         total_money_lost: isMisser ? (currentStats?.total_money_lost || 0) + FINE_AMOUNT : (currentStats?.total_money_lost || 0),
         current_week_pending_rewards: isEarner ? (currentStats?.current_week_pending_rewards || 0) + rewardPerUser : (currentStats?.current_week_pending_rewards || 0),
         total_money_earned: isEarner ? (currentStats?.total_money_earned || 0) + rewardPerUser : (currentStats?.total_money_earned || 0),

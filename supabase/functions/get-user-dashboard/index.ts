@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import nodemailer from "npm:nodemailer";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -15,7 +14,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { userId } = await req.json();
+    const { userId, usersCreatedAt } = await req.json();
     if (!userId) throw new Error("User ID is required");
 
     // 1. Fetch User Stats & Details
@@ -62,8 +61,9 @@ serve(async (req) => {
       submissionsPromise
     ]);
 
-    // Format the 30-day activity map
-    const activity = formatActivity(submissionsRes.data || []);
+    // 5. Generate Dynamic Calendar
+    const signupDate = usersCreatedAt ? new Date(usersCreatedAt) : new Date();
+    const activity = formatDynamicActivity(signupDate, submissionsRes.data || []);
 
     return new Response(
       JSON.stringify({
@@ -84,17 +84,41 @@ serve(async (req) => {
 });
 
 // Helper function to map last 30 days
-function formatActivity(submissions: any[]) {
+/**
+ * Generates 30 days of activity starting from signupDate
+ */
+function formatDynamicActivity(signupDate: Date, submissions: any[]) {
   const result = [];
-  for (let i = 0; i < 30; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().split('T')[0];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
+  // Normalize signup date to start of day
+  const startDate = new Date(signupDate);
+  startDate.setHours(0, 0, 0, 0);
+
+  for (let i = 0; i < 30; i++) {
+    const targetDate = new Date(startDate);
+    targetDate.setDate(startDate.getDate() + i);
+    
+    const dateStr = targetDate.toISOString().split('T')[0];
+    const isToday = targetDate.getTime() === today.getTime();
+    const isFuture = targetDate.getTime() > today.getTime();
+
+    // Check if user submitted on this specific date
     const sub = submissions.find(s => s.created_at.startsWith(dateStr));
+
+    let status = 'missed';
+    if (isFuture) {
+      status = 'future';
+    } else if (sub) {
+      status = (sub.status.toLowerCase() === 'rejected') ? 'missed' : 'submitted';
+    }
+
+    if(status=='missed' && isToday) { status ='today' } 
+
     result.push({
       date: dateStr,
-      status: sub ? (sub.status === 'rejected' ? 'missed' : 'submitted') : 'missed'
+      status: status,
     });
   }
   return result;
