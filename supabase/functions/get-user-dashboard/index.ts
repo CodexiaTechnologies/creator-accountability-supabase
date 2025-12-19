@@ -63,14 +63,15 @@ serve(async (req) => {
 
     // 5. Generate Dynamic Calendar
     const signupDate = usersCreatedAt ? new Date(usersCreatedAt) : new Date();
-    const activity = formatDynamicActivity(signupDate, submissionsRes.data || []);
+    const activityData = formatDynamicActivity(signupDate, submissionsRes.data || []);
 
     return new Response(
       JSON.stringify({
         stats: statsRes.data,
         leaderboard: leaderboardRes.data,
         userRank: rankRes.data,
-        activity: activity
+        activity: activityData.result,
+        isTodayPosted: activityData.todayPosted
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -91,6 +92,7 @@ function formatDynamicActivity(signupDate: Date, submissions: any[]) {
   const result = [];
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  let isTodayPosted = false;
 
   // Normalize signup date to start of day
   const startDate = new Date(signupDate);
@@ -114,12 +116,15 @@ function formatDynamicActivity(signupDate: Date, submissions: any[]) {
       status = (sub.status.toLowerCase() === 'rejected') ? 'missed' : 'submitted';
     }
 
-    if(status=='missed' && isToday) { status ='today' } 
+    if(isToday) {
+      if(status=='missed' ) { status ='today' } 
+      else { isTodayPosted = true }
+    }
 
     result.push({
       date: dateStr,
       status: status,
     });
   }
-  return result;
+  return {result: result, todayPosted: isTodayPosted};
 }
