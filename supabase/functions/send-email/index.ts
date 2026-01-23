@@ -46,11 +46,8 @@ serve(async (req) => {
       .from("users")
       .select("*")
       .not("stripe_customer_id", "is", null)
-      .not("start_date", "is", null)
-      .not("is_completed", "is", true)
-    // .lte("start_date", currentDate)
-    // .gte("end_date", currentDate);
-
+      // .not("start_date", "is", null)
+      // .not("is_completed", "is", true)
     if (userError) throw userError;
 
     console.log(`👤 Found ${users?.length || 0} active users`);

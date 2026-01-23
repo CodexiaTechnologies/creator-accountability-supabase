@@ -88,16 +88,68 @@ serve(async (req) => {
 /**
  * Generates 30 days of activity starting from signupDate
  */
+// function formatDynamicActivity(signupDate: Date, submissions: any[]) {
+//   const result = [];
+//   const today = new Date();
+//   today.setHours(0, 0, 0, 0);
+//   let isTodayPosted = false;
+
+//   // Normalize signup date to start of day
+//   const startDate = new Date(signupDate);
+//   startDate.setHours(0, 0, 0, 0);
+
+//   for (let i = 0; i < 30; i++) {
+//     const targetDate = new Date(startDate);
+//     targetDate.setDate(startDate.getDate() + i);
+    
+//     const dateStr = targetDate.toISOString().split('T')[0];
+//     const isToday = targetDate.getTime() === today.getTime();
+//     const isFuture = targetDate.getTime() > today.getTime();
+
+//     // Check if user submitted on this specific date
+//     const sub = submissions.find(s => s.created_at.startsWith(dateStr));
+
+//     let status = 'missed';
+//     if (isFuture) {
+//       status = 'future';
+//     } else if (sub) {
+//       status = (sub.status.toLowerCase() === 'rejected') ? 'missed' : 'submitted';
+//     }
+
+//     if(isToday) {
+//       if(status=='missed' ) { status ='today' } 
+//       else { isTodayPosted = true }
+//     }
+
+//     result.push({
+//       date: dateStr,
+//       status: status,
+//     });
+//   }
+//   return {result: result, todayPosted: isTodayPosted};
+// }
+
 function formatDynamicActivity(signupDate: Date, submissions: any[]) {
   const result = [];
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   let isTodayPosted = false;
 
-  // Normalize signup date to start of day
-  const startDate = new Date(signupDate);
+  // 1. Calculate the cutoff for "30 days ago"
+  const thirtyDaysAgo = new Date(today);
+  thirtyDaysAgo.setDate(today.getDate() - 29); // 29 + today = 30 days total
+
+  // 2. Determine the anchor point
+  // If signup was > 30 days ago, start from 30 days ago. 
+  // Otherwise, start from the signup date.
+  let startDate = new Date(signupDate);
   startDate.setHours(0, 0, 0, 0);
 
+  if (startDate < thirtyDaysAgo) {
+    startDate = thirtyDaysAgo;
+  }
+
+  // 3. Loop 30 times (or until we hit the 30-day limit)
   for (let i = 0; i < 30; i++) {
     const targetDate = new Date(startDate);
     targetDate.setDate(startDate.getDate() + i);
@@ -116,15 +168,20 @@ function formatDynamicActivity(signupDate: Date, submissions: any[]) {
       status = (sub.status.toLowerCase() === 'rejected') ? 'missed' : 'submitted';
     }
 
-    if(isToday) {
-      if(status=='missed' ) { status ='today' } 
-      else { isTodayPosted = true }
+    if (isToday) {
+      if (status === 'missed') { 
+        status = 'today'; 
+      } else { 
+        isTodayPosted = true; 
+      }
     }
 
     result.push({
       date: dateStr,
       status: status,
+      isToday: isToday // Useful to have this boolean for frontend styling
     });
   }
-  return {result: result, todayPosted: isTodayPosted};
+  
+  return { result: result, todayPosted: isTodayPosted };
 }

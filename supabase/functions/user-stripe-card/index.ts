@@ -84,9 +84,9 @@ serve(async (req) => {
       .from("users").update({
         stripe_customer_id: customerId,
         default_payment_method: paymentMethodId, // ✅ Save it
-        start_date: formatDate(startDate),
-        end_date: formatDate(endDate),
-        missed_days: 0,
+        // start_date: formatDate(startDate),
+        // end_date: formatDate(endDate),
+        // missed_days: 0,
         is_completed: false,
       }).eq("id", userId);
 
