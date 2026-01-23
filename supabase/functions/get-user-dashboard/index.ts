@@ -32,11 +32,15 @@ serve(async (req) => {
       .from('user_stats')
       .select(`
         current_streak,
+        current_week_streak,
         total_money_earned,
+        current_week_pending_rewards,
+        current_week_submissions,
         users ( name, profile_image )
       `)
-      .order('current_streak', { ascending: false })
-      .limit(10);
+      .order('current_week_submissions', { ascending: false }) // Ranking based on volume
+      .order('total_money_earned', { ascending: false })       // Tie-breaker
+      .limit(50);
 
     // 3. Calculate Current User Rank
     // (Count how many users have a higher streak than this user)

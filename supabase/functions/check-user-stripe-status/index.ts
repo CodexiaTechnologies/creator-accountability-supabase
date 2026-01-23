@@ -24,7 +24,7 @@ serve(async (req) => {
       if (!user || !user.stripe_account_id) return new Response(JSON.stringify({ error: "User or stripe_account_id not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       else { 
         stripe_id = user.stripe_account_id;
-        s_key_env = user.stripe_env || "STRIPE_TEST_KEY";
+        s_key_env = user.stripe_env || "STRIPE_LIVE_KEY";
       }
     }
 

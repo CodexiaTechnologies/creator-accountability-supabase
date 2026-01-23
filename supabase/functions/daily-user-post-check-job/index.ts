@@ -18,7 +18,6 @@ serve(async (req) => {
 
   // 2. Initialize Supabase client with the service role key
   const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
-  const stripeDefault = new Stripe(Deno.env.get("STRIPE_TEST_KEY") ?? "", { apiVersion: "2020-08-27" });
 
   try {
     console.log("Starting daily challenge check...");
@@ -29,13 +28,6 @@ serve(async (req) => {
     const yesterdayDate = yesterday.toISOString().split('T')[0];
     const currentDate = new Date().toISOString().split('T')[0];
     const isMonday = new Date().getDay() === 1; // 1 = Monday (Day after Sunday end)
-
-    // const isFriday = new Date().getDay() === 5; // 1 = Monday (Day after Sunday end)
-    // console.log('is Friday', isFriday)
-    // if (isFriday) {
-    //   await handleWeeklyPayout(supabase);
-    // }
-    // return new Response(JSON.stringify({ success: true, rewardPerUser:0 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const SMTP = {
       name: "Creator Accountability",
@@ -85,7 +77,7 @@ serve(async (req) => {
       if (!paymentExists) {
         let isPaid = false, paymentData = null, rejectedData = null;
         try {
-          let s_key_env = user.stripe_env || "STRIPE_TEST_KEY";
+          let s_key_env = user.stripe_env || "STRIPE_LIVE_KEY";
           const stripe = new Stripe(Deno.env.get(s_key_env) ?? "", { apiVersion: "2020-08-27" });
 
           paymentData = await stripe.paymentIntents.create({
@@ -228,7 +220,7 @@ async function handleWeeklyPayout(supabase: any) {
     // 2. Attempt Stripe Transfer if Account ID exists
     if (stripeAccountId && totalToTransfer > 0) {
       try {
-        let s_key_env = stat.users.stripe_env || "STRIPE_TEST_KEY";
+        let s_key_env = stat.users.stripe_env || "STRIPE_LIVE_KEY";
         const stripe = new Stripe(Deno.env.get(s_key_env) ?? "", { apiVersion: "2020-08-27" });
 
         const transferData = await stripe.transfers.create({
@@ -261,6 +253,7 @@ async function handleWeeklyPayout(supabase: any) {
     await supabase.from("user_stats").update({
       pending_withdrawal_balance: transferSuccessful ? 0 : totalToTransfer,
       current_week_pending_rewards: 0,
+      current_week_submissions: 0,
       current_week_streak: 0
     }).eq("user_id", stat.user_id);
     console.log('STATS 1.3');

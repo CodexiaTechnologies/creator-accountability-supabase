@@ -226,7 +226,7 @@ export async function processPenalty(user: any, creator: any, shares_data: any, 
 
     }
 
-    let s_key_env = user.stripe_env || creator?.stripe_env || "STRIPE_TEST_KEY";
+    let s_key_env = user.stripe_env || "STRIPE_LIVE_KEY";
     const stripe = new Stripe(Deno.env.get(s_key_env) ?? "", { apiVersion: "2020-08-27" });
 
     stripePaymentData.transaction = await stripe.paymentIntents.create(paymentIntentObj);
