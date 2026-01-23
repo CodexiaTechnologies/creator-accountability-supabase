@@ -41,7 +41,7 @@ serve(async (req) => {
     const { data: creatorData, error: dbError } = await supabase.from("creators").insert({
       auth_user_id: newUser.id,
       email,
-      stripe_env: 'STRIPE_TEST_KEY',
+      stripe_env: 'STRIPE_LIVE_KEY',
       bio: bio || '',
       full_name,
       creator_url_id: creator_slug
