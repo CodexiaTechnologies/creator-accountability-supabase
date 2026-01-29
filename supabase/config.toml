@@ -519,3 +519,25 @@ entrypoint = "./functions/linkedin-token-exchange/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/linkedin-token-exchange/*.html" ]
+
+[functions.get-threads]
+enabled = true
+verify_jwt = true
+import_map = "./functions/get-threads/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/get-threads/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/get-threads/*.html" ]
+
+[functions.upsert-threads]
+enabled = true
+verify_jwt = true
+import_map = "./functions/upsert-threads/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/upsert-threads/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/upsert-threads/*.html" ]
