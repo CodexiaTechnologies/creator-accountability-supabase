@@ -34,6 +34,7 @@ serve(async (req) => {
         .from("discussion_posts")
         .select(`
           id,
+          user_id,
           title,
           description,
           tags,
@@ -41,6 +42,7 @@ serve(async (req) => {
           users ( name ),
           discussion_comments (
             id,
+            user_id,
             comment,
             created_at,
             users ( name )
@@ -65,6 +67,7 @@ serve(async (req) => {
       .from("discussion_posts")
       .select(`
         id,
+        user_id,
         title,
         tags,
         created_at,
@@ -109,6 +112,7 @@ serve(async (req) => {
     // Transform response: add replies_count
     const threads = filteredData.map((post) => ({
       id: post.id,
+      user_id: post.user_id,
       title: post.title,
       tags: post.tags,
       created_at: post.created_at,
