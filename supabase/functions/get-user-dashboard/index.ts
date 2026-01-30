@@ -88,50 +88,6 @@ serve(async (req) => {
   }
 });
 
-// Helper function to map last 30 days
-/**
- * Generates 30 days of activity starting from signupDate
- */
-// function formatDynamicActivity(signupDate: Date, submissions: any[]) {
-//   const result = [];
-//   const today = new Date();
-//   today.setHours(0, 0, 0, 0);
-//   let isTodayPosted = false;
-
-//   // Normalize signup date to start of day
-//   const startDate = new Date(signupDate);
-//   startDate.setHours(0, 0, 0, 0);
-
-//   for (let i = 0; i < 30; i++) {
-//     const targetDate = new Date(startDate);
-//     targetDate.setDate(startDate.getDate() + i);
-    
-//     const dateStr = targetDate.toISOString().split('T')[0];
-//     const isToday = targetDate.getTime() === today.getTime();
-//     const isFuture = targetDate.getTime() > today.getTime();
-
-//     // Check if user submitted on this specific date
-//     const sub = submissions.find(s => s.created_at.startsWith(dateStr));
-
-//     let status = 'missed';
-//     if (isFuture) {
-//       status = 'future';
-//     } else if (sub) {
-//       status = (sub.status.toLowerCase() === 'rejected') ? 'missed' : 'submitted';
-//     }
-
-//     if(isToday) {
-//       if(status=='missed' ) { status ='today' } 
-//       else { isTodayPosted = true }
-//     }
-
-//     result.push({
-//       date: dateStr,
-//       status: status,
-//     });
-//   }
-//   return {result: result, todayPosted: isTodayPosted};
-// }
 
 function formatDynamicActivity(signupDate: Date, submissions: any[]) {
   const result = [];

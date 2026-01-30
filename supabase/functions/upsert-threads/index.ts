@@ -8,15 +8,12 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log('step 0');
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
-
+  console.log('step 1');
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
 
     const {
       type,
@@ -38,10 +35,19 @@ serve(async (req) => {
       throw new Error("type, action and user_id are required");
     }
 
+    console.log('step 2', type, action, user_id);
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
     /* -------------------------------------------------------
        1️⃣ THREAD (POST)
     ------------------------------------------------------- */
     if (type === "post") {
+
+      console.log('step 2 post');
 
       if (action === "create") {
         if (!title) throw new Error("title is required");
@@ -59,10 +65,12 @@ serve(async (req) => {
 
         if (error) throw error;
 
-        return success("Post created successfully", data);
-      }
+        return new Response(
+          JSON.stringify({ message: "Post created successfully", data }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
 
-      if (action === "update") {
+      } else if (action === "update") {
         if (!post_id) throw new Error("post_id is required for update");
 
         const { data, error } = await supabase
@@ -80,15 +88,14 @@ serve(async (req) => {
 
         if (error) throw error;
 
-        return success("Post updated successfully", data);
+        return new Response(
+          JSON.stringify({ message: "Post updated successfully", data }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
-    }
+    } else if (type === "comment") {
 
-    /* -------------------------------------------------------
-       2️⃣ COMMENT
-    ------------------------------------------------------- */
-    if (type === "comment") {
-
+      console.log('step 2 comment');
       if (action === "create") {
         if (!post_id || !comment) {
           throw new Error("post_id and comment are required");
@@ -106,10 +113,11 @@ serve(async (req) => {
 
         if (error) throw error;
 
-        return success("Comment added successfully", data);
-      }
-
-      if (action === "update") {
+        return new Response(
+          JSON.stringify({ message: "Comment added successfully", data }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } else if (action === "update") {
         if (!comment_id) {
           throw new Error("comment_id is required for update");
         }
@@ -127,15 +135,21 @@ serve(async (req) => {
 
         if (error) throw error;
 
-        return success("Comment updated successfully", data);
+        return new Response(
+          JSON.stringify({ message: "Comment updated successfully", data }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
     }
+
+    console.log('step 3');
 
     throw new Error("Invalid type or action");
 
   } catch (error) {
+    console.log('step 4', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error?.message || 'Data not created/update' }),
       {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -143,13 +157,3 @@ serve(async (req) => {
     );
   }
 });
-
-/* -------------------------------------------------------
-   Helper
-------------------------------------------------------- */
-function success(message: string, data: any) {
-  return new Response(
-    JSON.stringify({ message, data }),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-  );
-}

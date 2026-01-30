@@ -541,3 +541,14 @@ entrypoint = "./functions/upsert-threads/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/upsert-threads/*.html" ]
+
+[functions.delete-discussion-item]
+enabled = true
+verify_jwt = true
+import_map = "./functions/delete-discussion-item/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/delete-discussion-item/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/delete-discussion-item/*.html" ]
